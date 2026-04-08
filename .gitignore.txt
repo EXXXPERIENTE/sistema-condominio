@@ -1,0 +1,46 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+.Python
+.env
+venv/
+.venv/
+env/
+ENV/
+
+# Banco de dados
+*.db
+*.sqlite
+*.sqlite3
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+logs/
+
+# Arquivos locais
+*.pyc
+config_local.py
+*.pem
+
+# Backup
+*.bak
+*.backup
+
+# Sensitive data
+*.key
+*.pem
+credentials.json
+
+# MySQL
+*.sql
+
+# Sistema
+.DS_Store
+Thumbs.db
