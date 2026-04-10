@@ -6,7 +6,7 @@ import os
 
 # Executar script de inicialização do banco
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-exec(open('init_db.py').read())
+exec(open('init_db.py', encoding='utf-8').read())
 
 from web_app.api import app
 
