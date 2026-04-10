@@ -14,7 +14,12 @@ app.secret_key = 'chave_mestra_condominio_2024'
 CORS(app)
 
 db = DatabaseManager()
-db.connect()
+# Garantir que o banco existe e está conectado
+if not db.connect():
+    print("⚠️ Banco não encontrado, criando...")
+    db.create_database()
+    db.connect()
+print("✅ Banco de dados conectado")
 
 
 def login_required(f):
