@@ -2,35 +2,105 @@ import sqlite3
 import hashlib
 from datetime import datetime, timedelta
 import os
+import threading
 
 
 class DatabaseManager:
+    _local = threading.local()
+
     def __init__(self, database='condominio.db'):
         self.database = database
-        self.connection = None
+
+    def get_connection(self):
+        """Retorna uma conexão para a thread atual"""
+        if not hasattr(self._local, 'connection'):
+            self._local.connection = sqlite3.connect(self.database, check_same_thread=False)
+            self._local.connection.row_factory = sqlite3.Row
+        return self._local.connection
 
     def connect(self):
         try:
-            self.connection = sqlite3.connect(self.database)
-            self.connection.row_factory = sqlite3.Row
+            self.get_connection()
             return True
         except Exception as e:
             print(f"Erro ao conectar: {e}")
             return False
 
     def close(self):
-        if self.connection:
-            self.connection.close()
+        if hasattr(self._local, 'connection'):
+            self._local.connection.close()
+            delattr(self._local, 'connection')
 
     def dict_fetch(self, cursor):
+        columns = [col[0] for col in cursor.description] if cursor.description else []
         rows = cursor.fetchall()
-        return [dict(row) for row in rows]
+        return [dict(zip(columns, row)) for row in rows]
 
     def dict_fetch_one(self, cursor):
+        columns = [col[0] for col in cursor.description] if cursor.description else []
         row = cursor.fetchone()
         if row:
-            return dict(row)
+            return dict(zip(columns, row))
         return None
+
+    def execute_query(self, query, params=None):
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+            if params:
+                cursor.execute(query, params)
+            else:
+                cursor.execute(query)
+            conn.commit()
+            cursor.close()
+            return True
+        except Exception as e:
+            print(f"Erro na query: {e}")
+            return False
+
+    def fetch_all(self, query, params=None):
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+            if params:
+                cursor.execute(query, params)
+            else:
+                cursor.execute(query)
+            result = self.dict_fetch(cursor)
+            cursor.close()
+            return result
+        except Exception as e:
+            print(f"Erro ao buscar dados: {e}")
+            return []
+
+    def fetch_one(self, query, params=None):
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+            if params:
+                cursor.execute(query, params)
+            else:
+                cursor.execute(query)
+            result = self.dict_fetch_one(cursor)
+            cursor.close()
+            return result
+        except Exception as e:
+            print(f"Erro: {e}")
+            return None
+
+    def authenticate_user(self, login, senha):
+        senha_hash = hashlib.sha256(senha.encode()).hexdigest()
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM usuarios WHERE login = ? AND senha = ? AND ativo = 1",
+                           (login, senha_hash))
+            result = self.dict_fetch_one(cursor)
+            cursor.close()
+            return result
+        except Exception as e:
+            print(f"Erro na autenticação: {e}")
+            return None
 
     def create_database(self):
         try:
@@ -56,9 +126,7 @@ class DatabaseManager:
                     senha TEXT NOT NULL,
                     tipo TEXT CHECK(tipo IN ('master', 'porteiro')) NOT NULL,
                     condominio_id INTEGER,
-                    ativo INTEGER DEFAULT 1,
-                    whatsapp TEXT,
-                    FOREIGN KEY (condominio_id) REFERENCES condominios(id)
+                    ativo INTEGER DEFAULT 1
                 )
             """)
 
@@ -67,18 +135,16 @@ class DatabaseManager:
                 CREATE TABLE IF NOT EXISTS pessoas (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     nome TEXT NOT NULL,
-                    tipo TEXT CHECK(tipo IN ('morador', 'visitante', 'entregador', 'tecnico')) NOT NULL,
+                    tipo TEXT NOT NULL,
                     documento TEXT,
                     telefone TEXT,
                     veiculo_placa TEXT,
                     veiculo_modelo TEXT,
-                    morador_permanente INTEGER DEFAULT 0,
                     condominio_id INTEGER,
                     apartamento TEXT,
                     bloqueado INTEGER DEFAULT 0,
                     motivo_bloqueio TEXT,
-                    status TEXT DEFAULT 'ATIVO',
-                    FOREIGN KEY (condominio_id) REFERENCES condominios(id)
+                    status TEXT DEFAULT 'ATIVO'
                 )
             """)
 
@@ -89,10 +155,7 @@ class DatabaseManager:
                     pessoa_id INTEGER,
                     data_entrada TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     usuario_registro INTEGER,
-                    observacao TEXT,
-                    recebido_por TEXT,
-                    FOREIGN KEY (pessoa_id) REFERENCES pessoas(id),
-                    FOREIGN KEY (usuario_registro) REFERENCES usuarios(id)
+                    observacao TEXT
                 )
             """)
 
@@ -100,14 +163,13 @@ class DatabaseManager:
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS permissoes (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    usuario_id INTEGER UNIQUE,
+                    usuario_id INTEGER,
                     pode_apagar_banco INTEGER DEFAULT 0,
                     pode_editar_cadastros INTEGER DEFAULT 1,
                     pode_deletar_registros INTEGER DEFAULT 0,
                     pode_gerenciar_porteiros INTEGER DEFAULT 0,
                     pode_criar_avisos INTEGER DEFAULT 0,
-                    pode_gerenciar_ocorrencias INTEGER DEFAULT 0,
-                    FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
+                    pode_gerenciar_ocorrencias INTEGER DEFAULT 0
                 )
             """)
 
@@ -117,14 +179,10 @@ class DatabaseManager:
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     titulo TEXT NOT NULL,
                     mensagem TEXT NOT NULL,
-                    tipo TEXT CHECK(tipo IN ('info', 'alerta', 'urgente', 'sucesso')) DEFAULT 'info',
+                    tipo TEXT DEFAULT 'info',
                     data_criacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    data_expiracao TIMESTAMP,
                     ativo INTEGER DEFAULT 1,
-                    criado_por INTEGER,
-                    condominio_id INTEGER,
-                    FOREIGN KEY (criado_por) REFERENCES usuarios(id),
-                    FOREIGN KEY (condominio_id) REFERENCES condominios(id)
+                    condominio_id INTEGER
                 )
             """)
 
@@ -134,40 +192,12 @@ class DatabaseManager:
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     titulo TEXT NOT NULL,
                     descricao TEXT NOT NULL,
-                    tipo TEXT CHECK(tipo IN ('reclamacao', 'manutencao', 'sugestao', 'informe')) DEFAULT 'reclamacao',
-                    status TEXT CHECK(status IN ('aberto', 'andamento', 'concluido', 'cancelado')) DEFAULT 'aberto',
-                    prioridade TEXT CHECK(prioridade IN ('baixa', 'media', 'alta', 'urgente')) DEFAULT 'media',
+                    tipo TEXT DEFAULT 'reclamacao',
+                    status TEXT DEFAULT 'aberto',
+                    prioridade TEXT DEFAULT 'media',
                     data_criacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    data_conclusao TIMESTAMP,
-                    criado_por INTEGER,
                     condominio_id INTEGER,
-                    responsavel TEXT,
-                    FOREIGN KEY (criado_por) REFERENCES usuarios(id),
-                    FOREIGN KEY (condominio_id) REFERENCES condominios(id)
-                )
-            """)
-
-            # Tabela fotos
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS fotos (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    pessoa_id INTEGER UNIQUE,
-                    caminho_foto TEXT,
-                    data_upload TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    FOREIGN KEY (pessoa_id) REFERENCES pessoas(id)
-                )
-            """)
-
-            # Tabela logs
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS logs (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    usuario_id INTEGER,
-                    acao TEXT,
-                    descricao TEXT,
-                    data_hora TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    ip TEXT,
-                    FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
+                    responsavel TEXT
                 )
             """)
 
@@ -187,11 +217,8 @@ class DatabaseManager:
                     (senha_hash,))
 
                 # Permissões master
-                cursor.execute("""
-                    INSERT INTO permissoes (usuario_id, pode_apagar_banco, pode_editar_cadastros, 
-                        pode_deletar_registros, pode_gerenciar_porteiros, pode_criar_avisos, pode_gerenciar_ocorrencias)
-                    VALUES (1, 1, 1, 1, 1, 1, 1)
-                """)
+                cursor.execute(
+                    "INSERT INTO permissoes (usuario_id, pode_apagar_banco, pode_editar_cadastros, pode_deletar_registros, pode_gerenciar_porteiros, pode_criar_avisos, pode_gerenciar_ocorrencias) VALUES (1, 1, 1, 1, 1, 1, 1)")
 
                 # Porteiros
                 senha_porteiro = hashlib.sha256('123456'.encode()).hexdigest()
@@ -199,7 +226,6 @@ class DatabaseManager:
                     "INSERT INTO usuarios (nome, login, senha, tipo, condominio_id) VALUES ('João Porteiro', 'joao', ?, 'porteiro', 1)",
                     (senha_porteiro,))
                 cursor.execute("INSERT INTO permissoes (usuario_id, pode_editar_cadastros) VALUES (2, 1)")
-
                 cursor.execute(
                     "INSERT INTO usuarios (nome, login, senha, tipo, condominio_id) VALUES ('Maria Porteira', 'maria', ?, 'porteiro', 2)",
                     (senha_porteiro,))
@@ -211,18 +237,7 @@ class DatabaseManager:
                 cursor.execute(
                     "INSERT INTO pessoas (nome, tipo, apartamento, telefone, condominio_id, status) VALUES ('Carlos Souza', 'morador', '202', '(11) 99999-2222', 1, 'ATIVO')")
                 cursor.execute(
-                    "INSERT INTO pessoas (nome, tipo, apartamento, telefone, condominio_id, status) VALUES ('Entregador Express', 'entregador', NULL, '(11) 3333-7777', 1, 'ATIVO')")
-                cursor.execute(
                     "INSERT INTO pessoas (nome, tipo, apartamento, telefone, condominio_id, status) VALUES ('Mariana Oliveira', 'morador', '303', '(11) 99999-3333', 2, 'ATIVO')")
-                cursor.execute(
-                    "INSERT INTO pessoas (nome, tipo, apartamento, telefone, condominio_id, status) VALUES ('Pedro Santos', 'morador', '404', '(11) 99999-4444', 2, 'ATIVO')")
-
-                # Registros exemplo
-                data_atual = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                cursor.execute("INSERT INTO registros (pessoa_id, data_entrada, usuario_registro) VALUES (1, ?, 1)",
-                               (data_atual,))
-                cursor.execute("INSERT INTO registros (pessoa_id, data_entrada, usuario_registro) VALUES (3, ?, 1)",
-                               (data_atual,))
 
             conn.commit()
             cursor.close()
@@ -234,7 +249,8 @@ class DatabaseManager:
 
     def get_user_permissions(self, user_id):
         try:
-            cursor = self.connection.cursor()
+            conn = self.get_connection()
+            cursor = conn.cursor()
             cursor.execute("SELECT * FROM permissoes WHERE usuario_id = ?", (user_id,))
             result = self.dict_fetch_one(cursor)
             cursor.close()
@@ -251,81 +267,6 @@ class DatabaseManager:
             'pode_gerenciar_ocorrencias': False
         }
 
-    def delete_database(self, password):
-        if password == "admin123":
-            try:
-                if os.path.exists(self.database):
-                    os.remove(self.database)
-                return True
-            except:
-                return False
-        return False
-
-    def authenticate_user(self, login, senha):
-        senha_hash = hashlib.sha256(senha.encode()).hexdigest()
-        try:
-            cursor = self.connection.cursor()
-            cursor.execute("SELECT * FROM usuarios WHERE login = ? AND senha = ? AND ativo = 1",
-                           (login, senha_hash))
-            result = self.dict_fetch_one(cursor)
-            cursor.close()
-            return result
-        except Exception as e:
-            print(f"Erro na autenticação: {e}")
-            return None
-
-    def log_action(self, usuario_id, acao, descricao, ip='localhost'):
-        try:
-            cursor = self.connection.cursor()
-            cursor.execute("INSERT INTO logs (usuario_id, acao, descricao, ip) VALUES (?, ?, ?, ?)",
-                           (usuario_id, acao, descricao, ip))
-            cursor.close()
-            return True
-        except:
-            return False
-
-    def execute_query(self, query, params=None):
-        try:
-            cursor = self.connection.cursor()
-            if params:
-                cursor.execute(query, params)
-            else:
-                cursor.execute(query)
-            self.connection.commit()
-            cursor.close()
-            return True
-        except Exception as e:
-            print(f"Erro na query: {e}")
-            return False
-
-    def fetch_all(self, query, params=None):
-        try:
-            cursor = self.connection.cursor()
-            if params:
-                cursor.execute(query, params)
-            else:
-                cursor.execute(query)
-            result = self.dict_fetch(cursor)
-            cursor.close()
-            return result
-        except Exception as e:
-            print(f"Erro ao buscar dados: {e}")
-            return []
-
-    def fetch_one(self, query, params=None):
-        try:
-            cursor = self.connection.cursor()
-            if params:
-                cursor.execute(query, params)
-            else:
-                cursor.execute(query)
-            result = self.dict_fetch_one(cursor)
-            cursor.close()
-            return result
-        except Exception as e:
-            print(f"Erro: {e}")
-            return None
-
     def get_estatisticas_by_user(self, user):
         stats = {
             'total_pessoas': 0,
@@ -333,35 +274,29 @@ class DatabaseManager:
             'avisos_ativos': 0,
             'porteiros_ativos': 0
         }
-
         try:
             if user['tipo'] == 'master':
                 result = self.fetch_one("SELECT COUNT(*) as total FROM pessoas")
                 stats['total_pessoas'] = result['total'] if result else 0
-
-                result = self.fetch_one("SELECT COUNT(*) as total FROM registros WHERE DATE(data_entrada) = DATE('now')")
+                result = self.fetch_one(
+                    "SELECT COUNT(*) as total FROM registros WHERE DATE(data_entrada) = DATE('now')")
                 stats['registros_hoje'] = result['total'] if result else 0
             else:
                 result = self.fetch_one("SELECT COUNT(*) as total FROM pessoas WHERE condominio_id = ?",
                                         (user['condominio_id'],))
                 stats['total_pessoas'] = result['total'] if result else 0
-
                 result = self.fetch_one("""
                     SELECT COUNT(*) as total FROM registros r
                     JOIN pessoas p ON r.pessoa_id = p.id
                     WHERE DATE(r.data_entrada) = DATE('now') AND p.condominio_id = ?
                 """, (user['condominio_id'],))
                 stats['registros_hoje'] = result['total'] if result else 0
-
             result = self.fetch_one("SELECT COUNT(*) as total FROM avisos WHERE ativo = 1")
             stats['avisos_ativos'] = result['total'] if result else 0
-
             result = self.fetch_one("SELECT COUNT(*) as total FROM usuarios WHERE tipo = 'porteiro' AND ativo = 1")
             stats['porteiros_ativos'] = result['total'] if result else 0
-
             return stats
-        except Exception as e:
-            print(f"Erro: {e}")
+        except:
             return stats
 
     def get_statistics(self):
@@ -503,7 +438,7 @@ class DatabaseManager:
             os.makedirs(backup_dir)
 
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        backup_file = os.path.join(backup_dir, f"backup_condominio_{timestamp}.sql")
+        backup_file = os.path.join(backup_dir, f"backup_condominio_{timestamp}.db")
 
         try:
             import shutil
@@ -525,10 +460,9 @@ class DatabaseManager:
 
     def salvar_foto(self, pessoa_id, caminho_foto):
         return self.execute_query("""
-            INSERT INTO fotos (pessoa_id, caminho_foto) 
-            VALUES (?, ?) 
-            ON CONFLICT(pessoa_id) DO UPDATE SET caminho_foto = ?, data_upload = CURRENT_TIMESTAMP
-        """, (pessoa_id, caminho_foto, caminho_foto))
+            INSERT OR REPLACE INTO fotos (pessoa_id, caminho_foto, data_upload) 
+            VALUES (?, ?, CURRENT_TIMESTAMP)
+        """, (pessoa_id, caminho_foto))
 
     def get_foto(self, pessoa_id):
         result = self.fetch_one("SELECT caminho_foto FROM fotos WHERE pessoa_id = ?", (pessoa_id,))

@@ -45,16 +45,26 @@ def index():
 @app.route('/api/login', methods=['POST'])
 def api_login():
     data = request.get_json()
-    user = db.authenticate_user(data.get('login'), data.get('senha'))
+    login = data.get('login')
+    senha = data.get('senha')
+
+    # Gerar hash SHA256 (igual ao banco)
+    senha_hash = hashlib.sha256(senha.encode()).hexdigest()
+    print(f"🔐 Tentando login: {login}")
+    print(f"   Hash gerado: {senha_hash}")
+
+    user = db.authenticate_user(login, senha)
+
     if user:
         session['user_id'] = user['id']
         session['user_nome'] = user['nome']
         session['user_tipo'] = user['tipo']
         session['user_condominio_id'] = user.get('condominio_id')
-        print(f"✅ Login: {user['nome']} - Tipo: {user['tipo']} - Condomínio ID: {user.get('condominio_id')}")
+        print(f"✅ Login: {user['nome']} - Tipo: {user['tipo']}")
         return jsonify({'success': True, 'user': user})
-    return jsonify({'success': False, 'error': 'Usuário ou senha inválidos!'})
 
+    print(f"❌ Falha no login: {login}")
+    return jsonify({'success': False, 'error': 'Usuário ou senha inválidos!'})
 
 @app.route('/api/logout', methods=['POST'])
 def api_logout():
