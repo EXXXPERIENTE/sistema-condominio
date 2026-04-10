@@ -19,7 +19,7 @@ if __name__ == '__main__':
     print()
     print("🔑 Credenciais:")
     print("   Master: master / admin123")
-    print("   Porteiro: joao / 123456")
+    print("   Porteiro: credenciais fornecidas pelo administrador")
     print()
     print("=" * 60)
 

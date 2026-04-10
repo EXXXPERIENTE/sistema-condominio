@@ -658,8 +658,7 @@ function abrirAjuda() {
                 </div>
                 <div style="margin-bottom:15px;border-left:4px solid #FF9800;padding-left:15px;">
                     <h3 style="color:#F57C00;margin-bottom:5px;">🔑 Credenciais</h3>
-                    <p><strong>Master:</strong> master / admin123</p>
-                    <p><strong>Porteiro:</strong> joao / 123456</p>
+                <p><strong>Porteiro:</strong> Credenciais fornecidas pelo administrador</p>
                 </div>
                 <div style="background:#FFF3E0;padding:10px;border-radius:10px;border-left:4px solid #FF9800;">
                     <strong>💡 Dica:</strong> Use a busca 🔍 para encontrar pessoas rapidamente!

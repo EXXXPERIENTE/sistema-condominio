@@ -6,15 +6,7 @@
   <component name="ChangeListManager">
     <list default="true" id="b19bb8c3-6e4f-40e4-a1e8-e784c75f9feb" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Segurança.rar" beforeDir="false" afterPath="$PROJECT_DIR$/Segurança.rar" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/comando.docx" beforeDir="false" afterPath="$PROJECT_DIR$/comando.docx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/corrigir_banco.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/popular_banco.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/testar_senha_mysql.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/web_app/api.py" beforeDir="false" afterPath="$PROJECT_DIR$/web_app/api.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/web_app/static/script.js" beforeDir="false" afterPath="$PROJECT_DIR$/web_app/static/script.js" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/web_app/templates/index.html" beforeDir="false" afterPath="$PROJECT_DIR$/web_app/templates/index.html" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/~$omando.docx" beforeDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
