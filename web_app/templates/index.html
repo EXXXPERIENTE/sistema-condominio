@@ -206,56 +206,70 @@
             display: block;
         }
 
-        .pessoa-card, .registro-item, .aviso-card, .ocorrencia-card, .porteiro-card, .condominio-item {
-            background: white;
-            border-radius: 12px;
-            padding: 20px;
-            margin-bottom: 12px;
+        .cards-container {
             display: flex;
-            justify-content: space-between;
-            align-items: center;
-            transition: all 0.3s;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            flex-direction: row;
             flex-wrap: wrap;
-            gap: 15px;
+            gap: 16px;
+            justify-content: flex-start;
         }
 
-        .pessoa-card:hover, .aviso-card:hover, .ocorrencia-card:hover {
-            transform: translateX(5px);
-            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        .pessoa-card, .registro-card, .aviso-card, .ocorrencia-card, .porteiro-card, .condominio-item {
+            background: white;
+            border-radius: 16px;
+            padding: 16px;
+            flex: 0 0 calc(33.333% - 16px);
+            min-width: 280px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            transition: all 0.3s ease;
         }
 
-        .pessoa-info, .porteiro-info {
-            flex: 1;
+        .pessoa-card:hover, .registro-card:hover, .aviso-card:hover, .ocorrencia-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 6px 16px rgba(0,0,0,0.15);
         }
 
-        .pessoa-nome, .porteiro-nome {
+        .pessoa-nome, .registro-nome, .aviso-titulo, .ocorrencia-titulo {
             font-weight: bold;
             font-size: 18px;
             color: #333;
             margin-bottom: 8px;
         }
 
-        .pessoa-detalhes, .porteiro-detalhes {
+        .pessoa-detalhes, .registro-detalhes, .aviso-info, .ocorrencia-info {
             display: flex;
-            gap: 20px;
-            font-size: 13px;
-            color: #666;
             flex-wrap: wrap;
-        }
-
-        .pessoa-actions, .porteiro-actions {
-            display: flex;
             gap: 8px;
+            margin: 8px 0;
+            font-size: 12px;
         }
 
-        .btn-entrada, .btn-edit, .btn-delete, .btn-bloquear, .btn-desbloquear {
-            background: none;
+        /* BOTÕES NA MESMA LINHA */
+        .pessoa-actions {
+            display: flex;
+            flex-direction: row;
+            gap: 5px;
+            justify-content: flex-end;
+            align-items: center;
+            margin-top: 10px;
+        }
+
+        .btn-entrada,
+        .btn-edit,
+        .btn-bloquear,
+        .btn-desbloquear,
+        .btn-delete {
+            width: 36px;
+            height: 36px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            padding: 0;
+            margin: 0;
             border: none;
-            font-size: 20px;
-            cursor: pointer;
-            padding: 8px;
             border-radius: 8px;
+            cursor: pointer;
             transition: all 0.2s;
         }
 
@@ -270,9 +284,24 @@
             transform: scale(1.05);
         }
 
-        .status-ativo { color: #27ae60; font-weight: bold; }
-        .status-bloqueado { color: #e74c3c; font-weight: bold; }
-        .status-inativo { color: #95a5a6; }
+        /* BOTÃO DE AJUDA */
+        .btn-ajuda {
+            background: linear-gradient(135deg, #FF9800, #F57C00);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 14px;
+            transition: all 0.3s;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+
+        .btn-ajuda:hover {
+            transform: scale(1.05);
+            background: linear-gradient(135deg, #F57C00, #E65100);
+        }
 
         .stats {
             display: grid;
@@ -310,14 +339,7 @@
         }
 
         .aviso-card { border-left: 4px solid #3498db; }
-        .aviso-card .aviso-titulo { font-weight: bold; font-size: 16px; margin-bottom: 8px; }
-        .aviso-card .aviso-mensagem { color: #555; margin-bottom: 10px; }
-        .aviso-card .aviso-data { font-size: 11px; color: #999; }
-
         .ocorrencia-card { border-left: 4px solid #f39c12; }
-        .ocorrencia-card .ocorrencia-titulo { font-weight: bold; font-size: 16px; margin-bottom: 8px; }
-        .ocorrencia-card .ocorrencia-descricao { color: #555; margin-bottom: 10px; }
-        .ocorrencia-card .ocorrencia-info { display: flex; gap: 15px; font-size: 12px; color: #999; flex-wrap: wrap; }
 
         .btn-primary {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -359,12 +381,6 @@
             width: 250px;
             margin-bottom: 20px;
             margin-left: 10px;
-        }
-
-        .loading {
-            text-align: center;
-            padding: 40px;
-            color: #999;
         }
 
         .modal {
@@ -424,28 +440,43 @@
             font-size: 14px;
         }
 
-        .modal-content input:focus, .modal-content select:focus, .modal-content textarea:focus {
-            outline: none;
-            border-color: #667eea;
-        }
-
-        .modal-content label {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            margin: 10px 0;
-        }
-
         hr {
             margin: 30px 0;
             border: none;
             border-top: 1px solid #e0e0e0;
         }
 
-        .condominio-item {
+        .badge-tipo, .badge-apartamento, .badge-telefone, .badge-documento, .badge-ativo, .badge-bloqueado {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            margin: 2px;
+        }
+        .badge-tipo { background: #e3f2fd; color: #1976d2; }
+        .badge-apartamento { background: #f3e5f5; color: #7b1fa2; }
+        .badge-telefone { background: #e8f5e9; color: #2e7d32; }
+        .badge-documento { background: #fff3e0; color: #e65100; }
+        .badge-ativo { background: #c8e6c9; color: #2e7d32; }
+        .badge-bloqueado { background: #ffcdd2; color: #c62828; }
+
+        .registro-data-hora {
             display: flex;
-            justify-content: space-between;
-            align-items: center;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin: 8px 0;
+            font-size: 12px;
+        }
+        .registro-dia { background: #e8eaf6; color: #3949ab; padding: 2px 8px; border-radius: 12px; font-weight: bold; }
+        .registro-data { background: #e8f5e9; color: #2e7d32; padding: 2px 8px; border-radius: 12px; }
+        .registro-hora { background: #e3f2fd; color: #1565c0; padding: 2px 8px; border-radius: 12px; font-weight: bold; }
+        .registro-usuario { font-size: 11px; color: #666; margin-top: 6px; }
+        .registro-observacao { background: #fff3e0; color: #e65100; padding: 4px 8px; border-radius: 8px; font-size: 11px; margin-top: 8px; }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #999;
         }
 
         @media (max-width: 768px) {
@@ -454,102 +485,14 @@
             .menu { justify-content: center; }
             .tab-btn { padding: 10px 15px; font-size: 12px; }
             .tab-content { padding: 15px; }
-            .pessoa-card, .registro-item { flex-direction: column; }
-            .pessoa-actions { justify-content: center; }
+            .pessoa-card, .registro-card, .aviso-card, .ocorrencia-card { flex: 0 0 calc(100% - 16px); }
             .stats { grid-template-columns: 1fr; }
-            .pessoa-detalhes { flex-direction: column; gap: 5px; }
+            .pessoa-actions { justify-content: center; }
         }
 
-        /* ==================== CARDS HORIZONTAIS ==================== */
-.cards-horizontal, .cards-horizontal-registros, .cards-horizontal-avisos, .cards-horizontal-ocorrencias {
-    display: flex;
-    flex-direction: row;
-    flex-wrap: wrap;
-    gap: 16px;
-    justify-content: flex-start;
-}
-
-.pessoa-card, .registro-card, .aviso-card, .ocorrencia-card, .porteiro-card, .condominio-item {
-    flex: 0 0 calc(33.333% - 16px);
-    min-width: 280px;
-    background: white;
-    border-radius: 16px;
-    padding: 16px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-    transition: all 0.3s ease;
-}
-
-.pessoa-card:hover, .registro-card:hover, .aviso-card:hover, .ocorrencia-card:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 6px 16px rgba(0,0,0,0.15);
-}
-
-.card-bloqueado {
-    background: #fff5f5;
-    border-left: 4px solid #e74c3c;
-}
-
-.pessoa-avatar, .registro-avatar, .porteiro-avatar, .condominio-avatar {
-    font-size: 48px;
-    text-align: center;
-    margin-bottom: 12px;
-}
-
-.badge-tipo, .badge-apartamento, .badge-telefone {
-    display: inline-block;
-    padding: 4px 8px;
-    border-radius: 12px;
-    font-size: 11px;
-    margin: 2px;
-}
-
-.badge-tipo { background: #e3f2fd; color: #1976d2; }
-.badge-apartamento { background: #f3e5f5; color: #7b1fa2; }
-.badge-telefone { background: #e8f5e9; color: #2e7d32; }
-.badge-ativo { background: #c8e6c9; color: #2e7d32; }
-.badge-bloqueado { background: #ffcdd2; color: #c62828; }
-
-.motivo-bloqueio {
-    font-size: 11px;
-    color: #c62828;
-    margin-top: 6px;
-    padding: 4px 8px;
-    background: #ffebee;
-    border-radius: 8px;
-}
-
-.registro-data-hora {
-    display: flex;
-    gap: 12px;
-    margin: 8px 0;
-    font-size: 12px;
-}
-
-.registro-data { color: #2e7d32; }
-.registro-hora { color: #1565c0; font-weight: bold; }
-.registro-usuario { font-size: 11px; color: #666; margin-top: 6px; }
-
-@media (max-width: 768px) {
-    .pessoa-card, .registro-card, .aviso-card, .ocorrencia-card, .porteiro-card, .condominio-item {
-        flex: 0 0 calc(100% - 16px);
-    }
-
-    .pessoa-actions {
-        justify-content: center;
-        margin-top: 10px;
-    }
-
-    .pessoa-detalhes {
-        flex-wrap: wrap;
-        justify-content: center;
-    }
-}
-
-@media (min-width: 769px) and (max-width: 1024px) {
-    .pessoa-card, .registro-card, .aviso-card, .ocorrencia-card, .porteiro-card, .condominio-item {
-        flex: 0 0 calc(50% - 16px);
-    }
-}
+        @media (min-width: 769px) and (max-width: 1024px) {
+            .pessoa-card, .registro-card, .aviso-card, .ocorrencia-card { flex: 0 0 calc(50% - 16px); }
+        }
     </style>
 </head>
 <body>
@@ -564,9 +507,8 @@
                 <button onclick="fazerLogin()">🔐 ENTRAR</button>
                 <div class="credentials">
                     <strong>📝 Credenciais de Acesso:</strong><br>
-                    👑 Master: master<br>
-                    👔 Porteiro: joao<br>
-                    <span style="font-size: 11px; color: #999;">(As senhas são fornecidas pelo administrador)</span>
+                    👑 Master: master / admin123<br>
+                    👔 Porteiro: joao / 123456
                 </div>
             </div>
         </div>
@@ -579,6 +521,7 @@
                     <div class="user-info">
                         <span class="user-name" id="userName"></span>
                         <span class="user-type" id="userType"></span>
+                        <button class="btn-ajuda" onclick="abrirAjuda()" title="Ajuda">❓ Ajuda</button>
                         <button class="logout-btn" onclick="fazerLogout()">🚪 Sair</button>
                     </div>
                 </div>
@@ -615,39 +558,43 @@
                 <div id="tabPessoas" class="tab-content">
                     <button class="btn-primary" onclick="abrirModalPessoa()">➕ Nova Pessoa</button>
                     <input type="text" id="searchPessoa" class="search-box" placeholder="🔍 Buscar pessoa...">
-                    <div id="listaPessoas"></div>
+                    <div id="listaPessoas" class="cards-container"></div>
                 </div>
 
                 <!-- Registros -->
                 <div id="tabRegistros" class="tab-content">
-                    <div id="listaRegistros"></div>
+                    <div id="listaRegistros" class="cards-container"></div>
                 </div>
 
                 <!-- Avisos -->
                 <div id="tabAvisos" class="tab-content">
                     <button class="btn-primary" onclick="abrirModalAviso()">📢 Novo Aviso</button>
-                    <div id="listaAvisos"></div>
+                    <div id="listaAvisos" class="cards-container"></div>
                 </div>
 
                 <!-- Ocorrências -->
                 <div id="tabOcorrencias" class="tab-content">
                     <button class="btn-primary" onclick="abrirModalOcorrencia()">⚠️ Nova Ocorrência</button>
-                    <div id="listaOcorrencias"></div>
+                    <div id="listaOcorrencias" class="cards-container"></div>
                 </div>
 
                 <!-- Porteiros -->
                 <div id="tabPorteiros" class="tab-content">
-                    <button class="btn-primary" onclick="abrirModalPorteiro()">👮 Novo Porteiro</button>
-                    <div id="listaPorteiros"></div>
+                    <button class="btn-primary master-only" onclick="abrirModalPorteiro()">👮 Novo Porteiro</button>
+                    <div id="listaPorteiros" class="cards-container"></div>
                 </div>
 
                 <!-- Configurações -->
                 <div id="tabConfig" class="tab-content">
-                    <button class="btn-primary" onclick="abrirModalCondominio()">🏢 Novo Condomínio</button>
-                    <div id="listaCondominios"></div>
+                    <button class="btn-primary master-only" onclick="abrirModalCondominio()">🏢 Novo Condomínio</button>
+                    <div id="listaCondominios" class="cards-container"></div>
                     <hr>
-                    <button class="btn-primary" onclick="criarBackup()">💾 Criar Backup</button>
-                    <button class="btn-danger" onclick="zerarBanco()">🗑️ ZERAR BANCO</button>
+                    <h3>📊 RELATÓRIOS</h3>
+                    <button class="btn-primary" onclick="exportarRelatorioRegistros()">📑 Exportar Registros (Excel)</button>
+                    <button class="btn-primary" onclick="exportarRelatorioPessoas()">👥 Exportar Pessoas (Excel)</button>
+                    <hr>
+                    <button class="btn-primary master-only" onclick="criarBackup()">💾 Criar Backup</button>
+                    <button class="btn-danger master-only" onclick="zerarBanco()">🗑️ ZERAR BANCO</button>
                 </div>
             </div>
         </div>
@@ -658,7 +605,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h3 id="modalTitle">Nova Pessoa</h3>
-                <span class="close" onclick="fecharModal()">&times;</span>
+                <span class="close" onclick="fecharModal('modalPessoa')">&times;</span>
             </div>
             <input type="hidden" id="pessoaId">
             <input type="text" id="pessoaNome" placeholder="Nome completo *">
@@ -668,10 +615,13 @@
                 <option value="entregador">📦 Entregador</option>
                 <option value="tecnico">🔧 Técnico</option>
             </select>
-            <input type="text" id="pessoaApartamento" placeholder="Apartamento (ex: 101, Bloco A-202)">
+            <input type="text" id="pessoaApartamento" placeholder="Apartamento">
             <input type="text" id="pessoaTelefone" placeholder="Telefone">
-            <input type="text" id="pessoaDocumento" placeholder="CPF / RG / Documento">
-            <input type="text" id="pessoaVeiculo" placeholder="Veículo (placa/modelo)">
+            <input type="text" id="pessoaDocumento" placeholder="CPF / RG">
+            <input type="text" id="pessoaVeiculo" placeholder="Veículo">
+            <select id="pessoaCondominio" style="display: none;">
+                <option value="">Selecione um condomínio</option>
+            </select>
             <button class="btn-primary" onclick="salvarPessoa()" style="width:100%">💾 Salvar</button>
         </div>
     </div>
@@ -680,9 +630,10 @@
     <div id="modalAviso" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h3>Novo Aviso</h3>
-                <span class="close" onclick="fecharModalAviso()">&times;</span>
+                <h3 id="modalAvisoTitle">Novo Aviso</h3>
+                <span class="close" onclick="fecharModal('modalAviso')">&times;</span>
             </div>
+            <input type="hidden" id="avisoId">
             <input type="text" id="avisoTitulo" placeholder="Título do aviso">
             <select id="avisoTipo">
                 <option value="info">ℹ️ Informação</option>
@@ -699,9 +650,10 @@
     <div id="modalOcorrencia" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h3>Nova Ocorrência</h3>
-                <span class="close" onclick="fecharModalOcorrencia()">&times;</span>
+                <h3 id="modalOcorrenciaTitle">Nova Ocorrência</h3>
+                <span class="close" onclick="fecharModal('modalOcorrencia')">&times;</span>
             </div>
+            <input type="hidden" id="ocorrenciaId">
             <input type="text" id="ocorrenciaTitulo" placeholder="Título">
             <select id="ocorrenciaTipo">
                 <option value="reclamacao">📢 Reclamação</option>
@@ -715,9 +667,15 @@
                 <option value="alta">🟠 Alta</option>
                 <option value="urgente">🔴 Urgente</option>
             </select>
+            <select id="ocorrenciaStatus">
+                <option value="aberto">📌 Aberto</option>
+                <option value="andamento">⚙️ Em Andamento</option>
+                <option value="concluido">✅ Concluído</option>
+                <option value="cancelado">❌ Cancelado</option>
+            </select>
             <textarea id="ocorrenciaDescricao" rows="4" placeholder="Descrição detalhada..."></textarea>
-            <input type="text" id="ocorrenciaResponsavel" placeholder="Responsável (opcional)">
-            <button class="btn-primary" onclick="salvarOcorrencia()" style="width:100%">📝 Registrar</button>
+            <input type="text" id="ocorrenciaResponsavel" placeholder="Responsável">
+            <button class="btn-primary" onclick="salvarOcorrencia()" style="width:100%">📝 Salvar</button>
         </div>
     </div>
 
@@ -726,7 +684,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h3 id="modalPorteiroTitle">Novo Porteiro</h3>
-                <span class="close" onclick="fecharModalPorteiro()">&times;</span>
+                <span class="close" onclick="fecharModal('modalPorteiro')">&times;</span>
             </div>
             <input type="hidden" id="porteiroId">
             <input type="text" id="porteiroNome" placeholder="Nome completo">
@@ -747,12 +705,27 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h3>Novo Condomínio</h3>
-                <span class="close" onclick="fecharModalCondominio()">&times;</span>
+                <span class="close" onclick="fecharModal('modalCondominio')">&times;</span>
             </div>
             <input type="text" id="condominioNome" placeholder="Nome do condomínio">
             <input type="text" id="condominioEndereco" placeholder="Endereço">
             <input type="text" id="condominioTelefone" placeholder="Telefone">
             <button class="btn-primary" onclick="salvarCondominio()" style="width:100%">🏢 Criar</button>
+        </div>
+    </div>
+
+    <!-- MODAL BLOQUEIO -->
+    <div id="modalBloqueio" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>🔒 Bloquear Pessoa</h3>
+                <span class="close" onclick="fecharModal('modalBloqueio')">&times;</span>
+            </div>
+            <input type="hidden" id="bloqueioId">
+            <input type="hidden" id="bloqueioNome">
+            <p id="bloqueioTexto"></p>
+            <textarea id="bloqueioMotivo" rows="4" placeholder="Digite o motivo do bloqueio..."></textarea>
+            <button class="btn-primary" onclick="confirmarBloqueio()" style="width:100%; margin-top:10px;">🔒 Bloquear</button>
         </div>
     </div>
 
