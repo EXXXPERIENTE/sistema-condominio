@@ -4,6 +4,13 @@
 import sys
 import os
 
+# No início do web_main.py, antes de rodar o app
+from database.db_manager import DatabaseManager
+db = DatabaseManager()
+if not db.connect():
+    db.create_database()
+    db.connect()
+
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from web_app.api import app
