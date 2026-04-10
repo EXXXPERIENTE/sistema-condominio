@@ -4,26 +4,17 @@
 import sys
 import os
 
+# Executar script de inicialização do banco
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+exec(open('init_db.py').read())
 
 from web_app.api import app
-from database.db_manager import DatabaseManager
 
 if __name__ == '__main__':
-    # Criar banco de dados se não existir
+    print()
     print("=" * 60)
-    print("  INICIANDO SISTEMA DE CONDOMÍNIOS")
+    print("  SISTEMA DE CONTROLE DE CONDOMÍNIOS - VERSÃO WEB")
     print("=" * 60)
-
-    # Verificar/Criar banco de dados
-    db = DatabaseManager()
-    if not os.path.exists('condominio.db'):
-        print("📁 Criando banco de dados...")
-        db.create_database()
-        print("✅ Banco de dados criado com sucesso!")
-    else:
-        print("📁 Banco de dados já existe")
-
     print()
     print("🌐 Servidor iniciado!")
     print("📱 Acesse: http://localhost:5000")
