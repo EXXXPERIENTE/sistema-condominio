@@ -116,17 +116,17 @@ def get_pessoas():
         condominio_id = session.get('user_condominio_id')
         if busca:
             pessoas = db.fetch_all(
-                "SELECT * FROM pessoas WHERE condominio_id = %s AND nome LIKE %s ORDER BY nome",
+                "SELECT * FROM pessoas WHERE condominio_id = ? AND nome LIKE ? ORDER BY nome",
                 (condominio_id, f'%{busca}%')
             )
         else:
             pessoas = db.fetch_all(
-                "SELECT * FROM pessoas WHERE condominio_id = %s ORDER BY nome",
+                "SELECT * FROM pessoas WHERE condominio_id = ? ORDER BY nome",
                 (condominio_id,)
             )
     else:
         if busca:
-            pessoas = db.fetch_all("SELECT * FROM pessoas WHERE nome LIKE %s ORDER BY nome", (f'%{busca}%',))
+            pessoas = db.fetch_all("SELECT * FROM pessoas WHERE nome LIKE ? ORDER BY nome", (f'%{busca}%',))
         else:
             pessoas = db.fetch_all("SELECT * FROM pessoas ORDER BY nome")
 
