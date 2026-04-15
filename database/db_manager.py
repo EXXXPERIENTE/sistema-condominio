@@ -1,6 +1,6 @@
 import sqlite3
 import hashlib
-from datetime import datetime, timedelta
+from datetime import datetime
 import os
 
 
@@ -75,9 +75,12 @@ class DatabaseManager:
             return None
 
     def create_database(self):
+        """Cria todas as tabelas e dados iniciais"""
         try:
             conn = sqlite3.connect(self.database)
             cursor = conn.cursor()
+
+            print("📝 Criando tabelas...")
 
             # Tabela condominios
             cursor.execute("""
@@ -175,32 +178,65 @@ class DatabaseManager:
                 )
             """)
 
+            print("✅ Tabelas criadas")
+
             # Verificar se já existem dados
             cursor.execute("SELECT COUNT(*) as total FROM usuarios")
             count = cursor.fetchone()[0]
 
             if count == 0:
-                # Inserir condomínios
-                cursor.execute("INSERT INTO condominios (nome) VALUES ('Condomínio Vila Verde'), ('Condomínio Parque das Árvores')")
+                print("📝 Inserindo dados iniciais...")
 
-                # Usuário master
+                # Inserir condomínios
+                cursor.execute("INSERT INTO condominios (id, nome) VALUES (1, 'Condomínio Vila Verde')")
+                cursor.execute("INSERT INTO condominios (id, nome) VALUES (2, 'Condomínio Parque das Árvores')")
+
+                # Usuário master (senha: admin123)
                 senha_hash = hashlib.sha256('admin123'.encode()).hexdigest()
-                cursor.execute("INSERT INTO usuarios (id, nome, login, senha, tipo) VALUES (1, 'Administrador Master', 'master', ?, 'master')", (senha_hash,))
+                cursor.execute("""
+                    INSERT INTO usuarios (id, nome, login, senha, tipo) 
+                    VALUES (1, 'Administrador Master', 'master', ?, 'master')
+                """, (senha_hash,))
 
                 # Permissões master
-                cursor.execute("INSERT INTO permissoes (usuario_id, pode_apagar_banco, pode_editar_cadastros, pode_deletar_registros, pode_gerenciar_porteiros, pode_criar_avisos, pode_gerenciar_ocorrencias) VALUES (1, 1, 1, 1, 1, 1, 1)")
+                cursor.execute("""
+                    INSERT INTO permissoes (usuario_id, pode_apagar_banco, pode_editar_cadastros, 
+                        pode_deletar_registros, pode_gerenciar_porteiros, pode_criar_avisos, pode_gerenciar_ocorrencias)
+                    VALUES (1, 1, 1, 1, 1, 1, 1)
+                """)
 
                 # Porteiros
                 senha_porteiro = hashlib.sha256('123456'.encode()).hexdigest()
-                cursor.execute("INSERT INTO usuarios (nome, login, senha, tipo, condominio_id) VALUES ('João Porteiro', 'joao', ?, 'porteiro', 1)", (senha_porteiro,))
+                cursor.execute("""
+                    INSERT INTO usuarios (id, nome, login, senha, tipo, condominio_id) 
+                    VALUES (2, 'João Porteiro', 'joao', ?, 'porteiro', 1)
+                """, (senha_porteiro,))
                 cursor.execute("INSERT INTO permissoes (usuario_id, pode_editar_cadastros) VALUES (2, 1)")
-                cursor.execute("INSERT INTO usuarios (nome, login, senha, tipo, condominio_id) VALUES ('Maria Porteira', 'maria', ?, 'porteiro', 2)", (senha_porteiro,))
+
+                cursor.execute("""
+                    INSERT INTO usuarios (id, nome, login, senha, tipo, condominio_id) 
+                    VALUES (3, 'Maria Porteira', 'maria', ?, 'porteiro', 2)
+                """, (senha_porteiro,))
                 cursor.execute("INSERT INTO permissoes (usuario_id, pode_editar_cadastros) VALUES (3, 1)")
 
                 # Pessoas exemplo
-                cursor.execute("INSERT INTO pessoas (nome, tipo, apartamento, telefone, condominio_id, status) VALUES ('Ana Silva', 'morador', '101', '(11) 99999-1111', 1, 'ATIVO')")
-                cursor.execute("INSERT INTO pessoas (nome, tipo, apartamento, telefone, condominio_id, status) VALUES ('Carlos Souza', 'morador', '202', '(11) 99999-2222', 1, 'ATIVO')")
-                cursor.execute("INSERT INTO pessoas (nome, tipo, apartamento, telefone, condominio_id, status) VALUES ('Mariana Oliveira', 'morador', '303', '(11) 99999-3333', 2, 'ATIVO')")
+                cursor.execute("""
+                    INSERT INTO pessoas (nome, tipo, apartamento, telefone, condominio_id, status) 
+                    VALUES ('Ana Silva', 'morador', '101', '(11) 99999-1111', 1, 'ATIVO')
+                """)
+                cursor.execute("""
+                    INSERT INTO pessoas (nome, tipo, apartamento, telefone, condominio_id, status) 
+                    VALUES ('Carlos Souza', 'morador', '202', '(11) 99999-2222', 1, 'ATIVO')
+                """)
+                cursor.execute("""
+                    INSERT INTO pessoas (nome, tipo, apartamento, telefone, condominio_id, status) 
+                    VALUES ('Mariana Oliveira', 'morador', '303', '(11) 99999-3333', 2, 'ATIVO')
+                """)
+
+                print("✅ Dados iniciais inseridos")
+                print("   Master: master / admin123")
+                print("   Porteiro: joao / 123456")
+                print("   Porteiro: maria / 123456")
 
             conn.commit()
             conn.close()
@@ -252,10 +288,12 @@ class DatabaseManager:
             if user['tipo'] == 'master':
                 result = self.fetch_one("SELECT COUNT(*) as total FROM pessoas")
                 stats['total_pessoas'] = result['total'] if result else 0
-                result = self.fetch_one("SELECT COUNT(*) as total FROM registros WHERE DATE(data_entrada) = DATE('now')")
+                result = self.fetch_one(
+                    "SELECT COUNT(*) as total FROM registros WHERE DATE(data_entrada) = DATE('now')")
                 stats['registros_hoje'] = result['total'] if result else 0
             else:
-                result = self.fetch_one("SELECT COUNT(*) as total FROM pessoas WHERE condominio_id = ?", (user['condominio_id'],))
+                result = self.fetch_one("SELECT COUNT(*) as total FROM pessoas WHERE condominio_id = ?",
+                                        (user['condominio_id'],))
                 stats['total_pessoas'] = result['total'] if result else 0
                 result = self.fetch_one("""
                     SELECT COUNT(*) as total FROM registros r
@@ -268,8 +306,7 @@ class DatabaseManager:
             result = self.fetch_one("SELECT COUNT(*) as total FROM usuarios WHERE tipo = 'porteiro' AND ativo = 1")
             stats['porteiros_ativos'] = result['total'] if result else 0
             return stats
-        except Exception as e:
-            print(f"Erro: {e}")
+        except:
             return stats
 
     def get_statistics(self):
