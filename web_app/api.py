@@ -53,7 +53,7 @@ def master_required(f):
 
 @app.route('/')
 def index():
-    return render_template('index.html')
+    return render_template('indexbackup.html')
 
 
 @app.route('/api/login', methods=['POST'])
@@ -789,4 +789,113 @@ if __name__ == '__main__':
         """
         cores = db.fetch_all(query)
         return jsonify({'success': True, 'cores': cores})
+
+
+# ==================== NOVAS ROTAS ====================
+
+# ENCOMENDAS
+@app.route('/api/encomendas', methods=['GET'])
+@login_required
+def get_encomendas():
+    condominio_id = request.args.get('condominio_id')
+    if not condominio_id and session.get('user_tipo') == 'porteiro':
+        condominio_id = session.get('user_condominio_id')
+
+    if condominio_id:
+        encomendas = db.fetch_all("SELECT * FROM encomendas WHERE condominio_id = ? ORDER BY data_recebimento DESC",
+                                  (condominio_id,))
+    else:
+        encomendas = db.fetch_all("SELECT * FROM encomendas ORDER BY data_recebimento DESC")
+
+    return jsonify({'success': True, 'encomendas': encomendas})
+
+
+@app.route('/api/encomendas', methods=['POST'])
+@login_required
+def create_encomenda():
+    data = request.get_json()
+
+    if session.get('user_tipo') == 'porteiro':
+        condominio_id = session.get('user_condominio_id')
+    else:
+        condominio_id = data.get('condominio_id')
+
+    # Gerar QR Code simples (hash)
+    import hashlib
+    qrcode_recebimento = hashlib.md5(f"{data.get('nome_destinatario')}{datetime.now()}".encode()).hexdigest()[:8]
+
+    db.execute_query("""
+        INSERT INTO encomendas (condominio_id, nome_destinatario, nome_entregador, qrcode_recebimento, status)
+        VALUES (?, ?, ?, ?, 'AGUARDANDO')
+    """, (condominio_id, data.get('nome_destinatario'), data.get('nome_entregador'), qrcode_recebimento))
+
+    return jsonify({'success': True, 'message': 'Encomenda registrada com sucesso!', 'qrcode': qrcode_recebimento})
+
+
+@app.route('/api/encomendas/<int:id>/retirar', methods=['PUT'])
+@login_required
+def retirar_encomenda(id):
+    data = request.get_json()
+
+    import hashlib
+    qrcode_retirada = hashlib.md5(f"{data.get('retirado_por')}{datetime.now()}".encode()).hexdigest()[:8]
+
+    db.execute_query("""
+        UPDATE encomendas 
+        SET status = 'RETIRADO', data_retirada = ?, retirado_por = ?, qrcode_retirada = ?
+        WHERE id = ?
+    """, (datetime.now().strftime('%Y-%m-%d %H:%M:%S'), data.get('retirado_por'), qrcode_retirada, id))
+
+    return jsonify({'success': True, 'message': 'Encomenda retirada com sucesso!', 'qrcode': qrcode_retirada})
+
+
+# ANOTAÇÕES COLORIDAS
+@app.route('/api/anotacoes', methods=['GET'])
+@login_required
+def get_anotacoes():
+    condominio_id = request.args.get('condominio_id')
+
+    if condominio_id:
+        anotacoes = db.fetch_all("SELECT * FROM anotacoes WHERE condominio_id = ? ORDER BY data_criacao DESC",
+                                 (condominio_id,))
+    else:
+        anotacoes = db.fetch_all("SELECT * FROM anotacoes ORDER BY data_criacao DESC")
+
+    return jsonify({'success': True, 'anotacoes': anotacoes})
+
+
+@app.route('/api/anotacoes', methods=['POST'])
+@login_required
+def create_anotacao():
+    data = request.get_json()
+
+    if session.get('user_tipo') == 'porteiro':
+        condominio_id = session.get('user_condominio_id')
+    else:
+        condominio_id = data.get('condominio_id')
+
+    # Definir cor baseada no tipo
+    cores = {
+        'aviso': '#FFEB3B',
+        'proibicao': '#FFCDD2',
+        'encomenda': '#C8E6C9',
+        'informacao': '#BBDEFB',
+        'urgente': '#FFE0B2'
+    }
+    cor = cores.get(data.get('tipo', 'informacao'), '#FFEB3B')
+
+    db.execute_query("""
+        INSERT INTO anotacoes (condominio_id, titulo, conteudo, tipo, cor, palavra_chave)
+        VALUES (?, ?, ?, ?, ?, ?)
+    """, (condominio_id, data.get('titulo'), data.get('conteudo'), data.get('tipo'), cor, data.get('palavra_chave')))
+
+    return jsonify({'success': True, 'message': 'Anotação criada com sucesso!'})
+
+
+@app.route('/api/anotacoes/<int:id>', methods=['DELETE'])
+@login_required
+@master_required
+def delete_anotacao(id):
+    db.execute_query("DELETE FROM anotacoes WHERE id = ?", (id,))
+    return jsonify({'success': True, 'message': 'Anotação removida!'})
 

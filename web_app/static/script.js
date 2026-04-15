@@ -177,14 +177,23 @@ async function fazerLogout() {
 }
 
 // ==================== PESSOAS ====================
+// Substitua a função carregarPessoas existente por esta
 async function carregarPessoas() {
     const busca = document.getElementById('searchPessoa')?.value || '';
     const lista = document.getElementById('listaPessoas');
     if (!lista) return;
+
     lista.innerHTML = '<div class="loading">🔄 Carregando...</div>';
+
     try {
-        const response = await fetch(`/api/pessoas?busca=${encodeURIComponent(busca)}`);
+        let url = `/api/pessoas?busca=${encodeURIComponent(busca)}`;
+        if (condominioSelecionado && user?.tipo === 'master') {
+            url += `&condominio_id=${condominioSelecionado}`;
+        }
+
+        const response = await fetch(url);
         const data = await response.json();
+
         if (data.success && data.pessoas) {
             if (data.pessoas.length === 0) {
                 lista.innerHTML = '<div class="loading">📭 Nenhuma pessoa encontrada</div>';
@@ -193,26 +202,28 @@ async function carregarPessoas() {
                     const isMaster = user && user.tipo === 'master';
                     const isBloqueado = p.status === 'BLOQUEADO';
                     return `
-                    <div class="pessoa-card ${isBloqueado ? 'card-bloqueado' : ''}">
-                        <div class="pessoa-avatar">${getAvatarIcon(p.tipo)}</div>
-                        <div class="pessoa-info">
-                            <div class="pessoa-nome">${escapeHtml(p.nome)}</div>
-                            <div class="pessoa-detalhes">
-                                <span class="badge-tipo">${getTipoIcon(p.tipo)} ${p.tipo}</span>
-                                <span class="badge-apartamento">🏠 ${p.apartamento || '-'}</span>
-                                <span class="badge-telefone">📞 ${formatarTelefoneExibicao(p.telefone)}</span>
-                                ${p.documento ? `<span class="badge-documento">🆔 ${formatarDocumentoExibicao(p.documento)}</span>` : ''}
-                                ${isBloqueado ? '<span class="badge-bloqueado">🚫 BLOQUEADO</span>' : '<span class="badge-ativo">✅ ATIVO</span>'}
+                    <div class="card">
+                        <div style="display: flex; justify-content: space-between; align-items: start;">
+                            <div>
+                                <h4>${escapeHtml(p.nome)}</h4>
+                                <div style="font-size: 12px; color: #666;">
+                                    <span>🏠 ${p.apartamento || '-'}</span>
+                                    <span>📞 ${p.telefone || '-'}</span>
+                                    ${p.placa ? `<span>🚗 ${p.placa}</span>` : ''}
+                                    ${p.bloco ? `<span>🏢 Bloco ${p.bloco}</span>` : ''}
+                                </div>
                             </div>
-                            ${p.motivo_bloqueio ? `<div class="motivo-bloqueio">Motivo: ${escapeHtml(p.motivo_bloqueio)}</div>` : ''}
-                        </div>
-
-                      <div class="pessoa-actions">
-    <button class="btn-entrada" style="width:36px; height:36px; display:inline-flex; align-items:center; justify-content:center; margin:0; padding:0;" onclick="abrirModalObservacao(${p.id}, '${escapeHtml(p.nome)}')" title="Registrar Entrada">🚪</button>
-    <button class="btn-edit" style="width:36px; height:36px; display:inline-flex; align-items:center; justify-content:center; margin:0; padding:0;" onclick="editarPessoa(${p.id})" title="Editar">✏️</button>
-    <button class="btn-bloquear" style="width:36px; height:36px; display:inline-flex; align-items:center; justify-content:center; margin:0; padding:0;" onclick="bloquearPessoa(${p.id}, '${escapeHtml(p.nome)}')" title="Bloquear">🔒</button>
-    <button class="btn-delete" style="width:36px; height:36px; display:inline-flex; align-items:center; justify-content:center; margin:0; padding:0;" onclick="deletarPessoa(${p.id}, '${escapeHtml(p.nome)}')" title="Excluir">🗑️</button>
-</div>
+                            <div class="pessoa-actions">
+                                <button class="btn-entrada" onclick="abrirModalObservacao(${p.id}, '${escapeHtml(p.nome)}')" title="Registrar Entrada">🚪</button>
+                                <button class="btn-edit" onclick="editarPessoa(${p.id})" title="Editar">✏️</button>
+                                ${isMaster ? `
+                                    ${isBloqueado ?
+                                        `<button class="btn-desbloquear" onclick="desbloquearPessoa(${p.id})" title="Desbloquear">🔓</button>` :
+                                        `<button class="btn-bloquear" onclick="bloquearPessoa(${p.id}, '${escapeHtml(p.nome)}')" title="Bloquear">🔒</button>`
+                                    }
+                                    <button class="btn-delete" onclick="deletarPessoa(${p.id}, '${escapeHtml(p.nome)}')" title="Excluir">🗑️</button>
+                                ` : ''}
+                            </div>
                         </div>
                     </div>`;
                 }).join('');
@@ -1353,6 +1364,367 @@ function getCorByBloco(bloco) {
     };
     return coresBloco[bloco] || '#95a5a6';
 }
+
+// ==================== NOVAS FUNÇÕES ====================
+
+// Variável global para o condomínio selecionado
+let condominioSelecionado = null;
+
+// ==================== MENU LATERAL ====================
+async function carregarCondominiosMenu() {
+    try {
+        const response = await fetch('/api/condominios');
+        const data = await response.json();
+
+        if (data.success && data.condominios) {
+            const lista = document.getElementById('condominiosList');
+            lista.innerHTML = '';
+
+            data.condominios.forEach(cond => {
+                const div = document.createElement('div');
+                div.className = 'condominio-item';
+                if (condominioSelecionado === cond.id) {
+                    div.classList.add('active');
+                }
+                div.innerHTML = `
+                    <span class="condominio-icon">🏢</span>
+                    <span class="condominio-nome">${escapeHtml(cond.nome)}</span>
+                `;
+                div.onclick = () => selecionarCondominio(cond.id, cond.nome);
+                lista.appendChild(div);
+            });
+        }
+    } catch (error) {
+        console.error('Erro ao carregar condomínios:', error);
+    }
+}
+
+function selecionarCondominio(id, nome) {
+    condominioSelecionado = id;
+    document.getElementById('condominioSelecionado').innerHTML = `🏢 ${escapeHtml(nome)}`;
+
+    // Atualizar destaque no menu
+    document.querySelectorAll('.condominio-item').forEach(item => {
+        item.classList.remove('active');
+    });
+    event.target.closest('.condominio-item').classList.add('active');
+
+    // Recarregar dados do condomínio selecionado
+    carregarPessoas();
+    carregarRegistros();
+    carregarEncomendas();
+    carregarAnotacoes();
+    carregarEstatisticas();
+}
+
+// ==================== ENCOMENDAS ====================
+async function carregarEncomendas() {
+    const lista = document.getElementById('listaEncomendas');
+    if (!lista) return;
+
+    lista.innerHTML = '<div class="loading">🔄 Carregando encomendas...</div>';
+
+    try {
+        let url = '/api/encomendas';
+        if (condominioSelecionado && user?.tipo === 'master') {
+            url += `?condominio_id=${condominioSelecionado}`;
+        }
+
+        const response = await fetch(url);
+        const data = await response.json();
+
+        if (data.success && data.encomendas) {
+            if (data.encomendas.length === 0) {
+                lista.innerHTML = '<div class="loading">📭 Nenhuma encomenda</div>';
+            } else {
+                lista.innerHTML = data.encomendas.map(e => {
+                    const statusClass = e.status === 'AGUARDANDO' ? 'status-aguardando' : 'status-retirado';
+                    return `
+                    <div class="card">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <h4>📦 ${escapeHtml(e.nome_destinatario)}</h4>
+                            <span class="${statusClass}">${e.status === 'AGUARDANDO' ? '⏳ Aguardando' : '✅ Retirado'}</span>
+                        </div>
+                        <div class="qrcode" style="margin: 10px 0;">
+                            🔑 QR: ${e.qrcode_recebimento || '---'}
+                        </div>
+                        <div style="font-size: 13px; color: #666;">
+                            <div>📅 Recebido: ${new Date(e.data_recebimento).toLocaleString()}</div>
+                            <div>🚚 Entregador: ${e.nome_entregador || '-'}</div>
+                            ${e.status === 'RETIRADO' ? `
+                            <div>✅ Retirado por: ${e.retirado_por || '-'}</div>
+                            <div>📅 Retirada: ${e.data_retirada ? new Date(e.data_retirada).toLocaleString() : '-'}</div>
+                            ` : ''}
+                        </div>
+                        ${e.status === 'AGUARDANDO' ? `
+                        <div style="margin-top: 10px;">
+                            <button class="btn-success" onclick="abrirModalRetirada(${e.id}, '${escapeHtml(e.nome_destinatario)}')">✅ Registrar Retirada</button>
+                        </div>
+                        ` : ''}
+                    </div>`;
+                }).join('');
+            }
+        }
+    } catch (error) {
+        lista.innerHTML = '<div class="loading">❌ Erro ao carregar</div>';
+        console.error(error);
+    }
+}
+
+function abrirModalEncomenda() {
+    document.getElementById('encomendaDestinatario').value = '';
+    document.getElementById('encomendaEntregador').value = '';
+    document.getElementById('encomendaObservacao').value = '';
+    document.getElementById('modalEncomenda').classList.add('active');
+}
+
+function fecharModalEncomenda() {
+    document.getElementById('modalEncomenda').classList.remove('active');
+}
+
+async function salvarEncomenda() {
+    const destinatario = document.getElementById('encomendaDestinatario').value.trim();
+    if (!destinatario) {
+        alert('Nome do destinatário é obrigatório!');
+        return;
+    }
+
+    const dados = {
+        nome_destinatario: destinatario,
+        nome_entregador: document.getElementById('encomendaEntregador').value,
+        observacao: document.getElementById('encomendaObservacao').value,
+        condominio_id: condominioSelecionado
+    };
+
+    try {
+        const response = await fetch('/api/encomendas', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(dados)
+        });
+        const data = await response.json();
+
+        if (data.success) {
+            alert('✅ Encomenda registrada com sucesso!\n\n🔑 QR Code: ' + data.qrcode);
+            fecharModalEncomenda();
+            await carregarEncomendas();
+            await carregarEstatisticas();
+        } else {
+            alert('❌ Erro: ' + data.error);
+        }
+    } catch (error) {
+        console.error('Erro:', error);
+        alert('❌ Erro ao salvar encomenda!');
+    }
+}
+
+function abrirModalRetirada(id, nome) {
+    const retiradoPor = prompt(`Registrar retirada da encomenda de ${nome}\n\nDigite o nome de quem está retirando:`);
+    if (!retiradoPor) return;
+
+    fetch(`/api/encomendas/${id}/retirar`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ retirado_por: retiradoPor })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            alert('✅ Retirada registrada!\n\n🔑 QR Code: ' + data.qrcode);
+            carregarEncomendas();
+            carregarEstatisticas();
+        } else {
+            alert('❌ Erro: ' + data.error);
+        }
+    })
+    .catch(error => console.error('Erro:', error));
+}
+
+// ==================== ANOTAÇÕES COLORIDAS ====================
+async function carregarAnotacoes() {
+    const lista = document.getElementById('listaAnotacoes');
+    if (!lista) return;
+
+    lista.innerHTML = '<div class="loading">🔄 Carregando anotações...</div>';
+
+    try {
+        let url = '/api/anotacoes';
+        if (condominioSelecionado && user?.tipo === 'master') {
+            url += `?condominio_id=${condominioSelecionado}`;
+        }
+
+        const response = await fetch(url);
+        const data = await response.json();
+
+        if (data.success && data.anotacoes) {
+            if (data.anotacoes.length === 0) {
+                lista.innerHTML = '<div class="loading">📭 Nenhuma anotação</div>';
+            } else {
+                lista.innerHTML = data.anotacoes.map(a => {
+                    let classeCor = '';
+                    switch(a.tipo) {
+                        case 'aviso': classeCor = 'anotacao-aviso'; break;
+                        case 'proibicao': classeCor = 'anotacao-proibicao'; break;
+                        case 'encomenda': classeCor = 'anotacao-encomenda'; break;
+                        case 'urgente': classeCor = 'anotacao-urgente'; break;
+                        default: classeCor = 'anotacao-informacao';
+                    }
+                    return `
+                    <div class="card ${classeCor}" style="border-left: 4px solid ${a.cor || '#FFEB3B'}">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <h4>${escapeHtml(a.titulo)}</h4>
+                            ${user?.tipo === 'master' ? `<button class="btn-danger" onclick="deletarAnotacao(${a.id})" style="padding: 4px 8px;">🗑️</button>` : ''}
+                        </div>
+                        <div style="margin: 10px 0;">${escapeHtml(a.conteudo)}</div>
+                        <div style="font-size: 12px; color: #666;">
+                            📅 ${new Date(a.data_criacao).toLocaleString()}
+                            ${a.palavra_chave ? `<br>🔑 Palavra-chave: ${escapeHtml(a.palavra_chave)}` : ''}
+                        </div>
+                    </div>`;
+                }).join('');
+            }
+        }
+    } catch (error) {
+        lista.innerHTML = '<div class="loading">❌ Erro ao carregar</div>';
+        console.error(error);
+    }
+}
+
+function abrirModalAnotacao() {
+    document.getElementById('anotacaoTitulo').value = '';
+    document.getElementById('anotacaoTipo').value = 'aviso';
+    document.getElementById('anotacaoConteudo').value = '';
+    document.getElementById('anotacaoPalavraChave').value = '';
+    document.getElementById('modalAnotacao').classList.add('active');
+}
+
+function fecharModalAnotacao() {
+    document.getElementById('modalAnotacao').classList.remove('active');
+}
+
+async function salvarAnotacao() {
+    const titulo = document.getElementById('anotacaoTitulo').value.trim();
+    const conteudo = document.getElementById('anotacaoConteudo').value.trim();
+
+    if (!titulo || !conteudo) {
+        alert('Preencha título e conteúdo!');
+        return;
+    }
+
+    const dados = {
+        titulo: titulo,
+        tipo: document.getElementById('anotacaoTipo').value,
+        conteudo: conteudo,
+        palavra_chave: document.getElementById('anotacaoPalavraChave').value,
+        condominio_id: condominioSelecionado
+    };
+
+    try {
+        const response = await fetch('/api/anotacoes', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(dados)
+        });
+        const data = await response.json();
+
+        if (data.success) {
+            alert('✅ Anotação criada com sucesso!');
+            fecharModalAnotacao();
+            await carregarAnotacoes();
+        } else {
+            alert('❌ Erro: ' + data.error);
+        }
+    } catch (error) {
+        console.error('Erro:', error);
+        alert('❌ Erro ao salvar anotação!');
+    }
+}
+
+async function deletarAnotacao(id) {
+    if (!confirm('Tem certeza que deseja deletar esta anotação?')) return;
+
+    try {
+        const response = await fetch(`/api/anotacoes/${id}`, { method: 'DELETE' });
+        const data = await response.json();
+
+        if (data.success) {
+            alert('✅ Anotação deletada!');
+            await carregarAnotacoes();
+        } else {
+            alert('❌ Erro: ' + data.error);
+        }
+    } catch (error) {
+        console.error('Erro:', error);
+        alert('❌ Erro ao deletar anotação!');
+    }
+}
+
+// ==================== ATUALIZAR ESTATÍSTICAS ====================
+async function carregarEstatisticas() {
+    try {
+        const response = await fetch('/api/estatisticas');
+        const data = await response.json();
+        if (data.success) {
+            document.getElementById('totalPessoas').innerText = data.estatisticas.total_pessoas || 0;
+            document.getElementById('totalRegistros').innerText = data.estatisticas.total_registros || 0;
+            document.getElementById('registrosHoje').innerText = data.estatisticas.registros_hoje || 0;
+        }
+
+        // Carregar total de encomendas
+        const encResponse = await fetch('/api/encomendas');
+        const encData = await encResponse.json();
+        if (encData.success) {
+            const totalEncomendas = encData.encomendas?.filter(e => e.status === 'AGUARDANDO').length || 0;
+            document.getElementById('totalEncomendas').innerText = totalEncomendas;
+        }
+    } catch (error) {
+        console.error('Erro estatisticas:', error);
+    }
+}
+
+// ==================== MOSTRAR ABA ====================
+function mostrarTab(tab) {
+    document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+    document.querySelector(`.tab-btn[data-tab="${tab}"]`).classList.add('active');
+    document.getElementById(`tab${tab.charAt(0).toUpperCase() + tab.slice(1)}`).classList.add('active');
+
+    // Recarregar dados específicos da aba
+    if (tab === 'pessoas') carregarPessoas();
+    if (tab === 'registros') carregarRegistros();
+    if (tab === 'encomendas') carregarEncomendas();
+    if (tab === 'avisos') carregarAvisos();
+    if (tab === 'ocorrencias') carregarOcorrencias();
+    if (tab === 'anotacoes') carregarAnotacoes();
+    if (tab === 'porteiros') carregarPorteiros();
+    if (tab === 'dashboard') carregarEstatisticas();
+    if (tab === 'config') carregarCondominios();
+}
+
+// ==================== SOBRESCREVER FUNÇÕES EXISTENTES ====================
+// Modificar a função fazerLogin para carregar o menu lateral
+const fazerLoginOriginal = fazerLogin;
+window.fazerLogin = async function() {
+    await fazerLoginOriginal();
+    if (user) {
+        document.getElementById('loginScreen').style.display = 'none';
+        document.getElementById('appContainer').classList.add('active');
+        await carregarCondominiosMenu();
+        if (user.tipo === 'master' && condominiosList.length > 0) {
+            selecionarCondominio(condominiosList[0].id, condominiosList[0].nome);
+        }
+    }
+};
+
+// Modificar a função fazerLogout
+const fazerLogoutOriginal = fazerLogout;
+window.fazerLogout = async function() {
+    await fazerLogoutOriginal();
+    document.getElementById('appContainer').classList.remove('active');
+    document.getElementById('loginScreen').style.display = 'block';
+    condominioSelecionado = null;
+};
+
 
 // Modificar a função carregarPessoas para mostrar cores
 // (adicione style="border-left: 4px solid {cor};" no card)
