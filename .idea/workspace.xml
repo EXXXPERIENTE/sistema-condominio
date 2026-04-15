@@ -5,7 +5,7 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="b19bb8c3-6e4f-40e4-a1e8-e784c75f9feb" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/web_main.py" beforeDir="false" afterPath="$PROJECT_DIR$/web_main.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/web_app/api.py" beforeDir="false" afterPath="$PROJECT_DIR$/web_app/api.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />

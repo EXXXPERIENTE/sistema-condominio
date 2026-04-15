@@ -13,12 +13,21 @@ app = Flask(__name__)
 app.secret_key = 'chave_mestra_condominio_2024'
 CORS(app)
 
+# ==================== CRIAÇÃO DO BANCO DE DADOS ====================
+# Garantir que o banco SQLite existe antes de qualquer operação
+db_setup = DatabaseManager()
+if not os.path.exists('condominio.db'):
+    print("📁 Banco de dados não encontrado. Criando...")
+    db_setup.create_database()
+    print("✅ Banco de dados criado com sucesso!")
+else:
+    print("📁 Banco de dados já existe.")
+db_setup.close()
+# ================================================================
+
+# Conectar ao banco para uso da aplicação
 db = DatabaseManager()
-# Garantir que o banco existe e está conectado
-if not db.connect():
-    print("⚠️ Banco não encontrado, criando...")
-    db.create_database()
-    db.connect()
+db.connect()
 print("✅ Banco de dados conectado")
 
 
@@ -50,26 +59,16 @@ def index():
 @app.route('/api/login', methods=['POST'])
 def api_login():
     data = request.get_json()
-    login = data.get('login')
-    senha = data.get('senha')
-
-    # Gerar hash SHA256 (igual ao banco)
-    senha_hash = hashlib.sha256(senha.encode()).hexdigest()
-    print(f"🔐 Tentando login: {login}")
-    print(f"   Hash gerado: {senha_hash}")
-
-    user = db.authenticate_user(login, senha)
-
+    user = db.authenticate_user(data.get('login'), data.get('senha'))
     if user:
         session['user_id'] = user['id']
         session['user_nome'] = user['nome']
         session['user_tipo'] = user['tipo']
         session['user_condominio_id'] = user.get('condominio_id')
-        print(f"✅ Login: {user['nome']} - Tipo: {user['tipo']}")
+        print(f"✅ Login: {user['nome']} - Tipo: {user['tipo']} - Condomínio ID: {user.get('condominio_id')}")
         return jsonify({'success': True, 'user': user})
-
-    print(f"❌ Falha no login: {login}")
     return jsonify({'success': False, 'error': 'Usuário ou senha inválidos!'})
+
 
 @app.route('/api/logout', methods=['POST'])
 def api_logout():
@@ -92,7 +91,7 @@ def get_condominios():
 def create_condominio():
     data = request.get_json()
     db.execute_query(
-        "INSERT INTO condominios (nome, endereco, telefone) VALUES (%s, %s, %s)",
+        "INSERT INTO condominios (nome, endereco, telefone) VALUES (?, ?, ?)",
         (data.get('nome'), data.get('endereco'), data.get('telefone'))
     )
     return jsonify({'success': True, 'message': 'Condomínio criado com sucesso!'})
@@ -102,7 +101,7 @@ def create_condominio():
 @login_required
 @master_required
 def delete_condominio(id):
-    db.execute_query("DELETE FROM condominios WHERE id = %s", (id,))
+    db.execute_query("DELETE FROM condominios WHERE id = ?", (id,))
     return jsonify({'success': True, 'message': 'Condomínio removido com sucesso!'})
 
 
@@ -149,7 +148,7 @@ def create_pessoa():
 
         query = """
             INSERT INTO pessoas (nome, tipo, apartamento, telefone, documento, veiculo_placa, veiculo_modelo, status, condominio_id) 
-            VALUES (%s, %s, %s, %s, %s, %s, %s, 'ATIVO', %s)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 'ATIVO', ?)
         """
         db.execute_query(query, (
             data.get('nome'),
@@ -173,9 +172,9 @@ def update_pessoa(id):
         data = request.get_json()
         query = """
             UPDATE pessoas 
-            SET nome=%s, tipo=%s, apartamento=%s, telefone=%s, documento=%s, 
-                veiculo_placa=%s, veiculo_modelo=%s
-            WHERE id=%s
+            SET nome=?, tipo=?, apartamento=?, telefone=?, documento=?, 
+                veiculo_placa=?, veiculo_modelo=?
+            WHERE id=?
         """
         db.execute_query(query, (
             data.get('nome'), data.get('tipo'), data.get('apartamento'),
@@ -192,8 +191,8 @@ def update_pessoa(id):
 @master_required
 def delete_pessoa(id):
     try:
-        db.execute_query("DELETE FROM registros WHERE pessoa_id = %s", (id,))
-        db.execute_query("DELETE FROM pessoas WHERE id = %s", (id,))
+        db.execute_query("DELETE FROM registros WHERE pessoa_id = ?", (id,))
+        db.execute_query("DELETE FROM pessoas WHERE id = ?", (id,))
         return jsonify({'success': True, 'message': 'Pessoa removida com sucesso!'})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
@@ -207,32 +206,27 @@ def registrar_entrada():
         pessoa_id = data.get('pessoa_id')
         observacao = data.get('observacao', '')
 
-        pessoa = db.fetch_one("SELECT status, nome, condominio_id, bloqueado FROM pessoas WHERE id=%s", (pessoa_id,))
+        pessoa = db.fetch_one("SELECT status, nome, condominio_id, bloqueado FROM pessoas WHERE id = ?", (pessoa_id,))
 
         if not pessoa:
             return jsonify({'success': False, 'error': 'Pessoa não encontrada!'})
 
-        # Verificar bloqueio (status ou campo bloqueado)
-        if pessoa.get('status') == 'BLOQUEADO' or pessoa.get('bloqueado') == 1:
-            return jsonify({'success': False, 'error': 'Pessoa bloqueada! Entrada não permitida.'}), 403
-
         if session.get('user_tipo') == 'porteiro':
             if pessoa.get('condominio_id') != session.get('user_condominio_id'):
-                return jsonify(
-                    {'success': False, 'error': 'Acesso negado! Esta pessoa não pertence ao seu condomínio.'}), 403
+                return jsonify({'success': False, 'error': 'Acesso negado!'}), 403
+
+        if pessoa.get('status') == 'BLOQUEADO' or pessoa.get('bloqueado') == 1:
+            return jsonify({'success': False, 'error': 'Pessoa bloqueada! Entrada não permitida.'}), 403
 
         usuario_registro = session.get('user_id')
 
         db.execute_query(
-            "INSERT INTO registros (pessoa_id, data_entrada, usuario_registro, observacao) VALUES (%s, %s, %s, %s)",
+            "INSERT INTO registros (pessoa_id, data_entrada, usuario_registro, observacao) VALUES (?, ?, ?, ?)",
             (pessoa_id, datetime.now().strftime('%Y-%m-%d %H:%M:%S'), usuario_registro, observacao)
         )
-
-        print(f"✅ Entrada registrada para: {pessoa['nome']} - Observação: {observacao if observacao else 'Nenhuma'}")
         return jsonify({'success': True, 'message': f'Entrada de {pessoa["nome"]} registrada com sucesso!'})
     except Exception as e:
-        print(f"❌ Erro ao registrar entrada: {str(e)}")
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return jsonify({'success': False, 'error': str(e)})
 
 
 @app.route('/api/registros', methods=['GET'])
@@ -250,7 +244,7 @@ def get_registros():
             FROM registros r 
             JOIN pessoas p ON r.pessoa_id = p.id 
             LEFT JOIN usuarios u ON r.usuario_registro = u.id
-            WHERE p.condominio_id = %s
+            WHERE p.condominio_id = ?
             ORDER BY r.data_entrada DESC 
             LIMIT 100
         """
@@ -278,12 +272,13 @@ def get_registros():
 
     return jsonify({'success': True, 'registros': registros})
 
+
 @app.route('/api/registros/<int:id>', methods=['DELETE'])
 @login_required
 @master_required
 def delete_registro(id):
     try:
-        db.execute_query("DELETE FROM registros WHERE id = %s", (id,))
+        db.execute_query("DELETE FROM registros WHERE id = ?", (id,))
         return jsonify({'success': True, 'message': 'Registro removido com sucesso!'})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
@@ -295,21 +290,21 @@ def delete_registro(id):
 def get_estatisticas():
     if session.get('user_tipo') == 'porteiro':
         condominio_id = session.get('user_condominio_id')
-        total_pessoas = db.fetch_one("SELECT COUNT(*) as total FROM pessoas WHERE condominio_id = %s", (condominio_id,))
+        total_pessoas = db.fetch_one("SELECT COUNT(*) as total FROM pessoas WHERE condominio_id = ?", (condominio_id,))
         total_registros = db.fetch_one(
-            "SELECT COUNT(*) as total FROM registros r JOIN pessoas p ON r.pessoa_id = p.id WHERE p.condominio_id = %s",
+            "SELECT COUNT(*) as total FROM registros r JOIN pessoas p ON r.pessoa_id = p.id WHERE p.condominio_id = ?",
             (condominio_id,))
         hoje = datetime.now().strftime('%Y-%m-%d')
         registros_hoje = db.fetch_one("""
             SELECT COUNT(*) as total FROM registros r 
             JOIN pessoas p ON r.pessoa_id = p.id 
-            WHERE p.condominio_id = %s AND DATE(r.data_entrada) = %s
+            WHERE p.condominio_id = ? AND DATE(r.data_entrada) = ?
         """, (condominio_id, hoje))
     else:
         total_pessoas = db.fetch_one("SELECT COUNT(*) as total FROM pessoas")
         total_registros = db.fetch_one("SELECT COUNT(*) as total FROM registros")
         hoje = datetime.now().strftime('%Y-%m-%d')
-        registros_hoje = db.fetch_one("SELECT COUNT(*) as total FROM registros WHERE DATE(data_entrada) = %s", (hoje,))
+        registros_hoje = db.fetch_one("SELECT COUNT(*) as total FROM registros WHERE DATE(data_entrada) = ?", (hoje,))
 
     return jsonify({
         'success': True,
@@ -334,7 +329,7 @@ def get_avisos():
             FROM avisos a
             LEFT JOIN condominios c ON a.condominio_id = c.id
             LEFT JOIN usuarios u ON a.criado_por = u.id
-            WHERE a.condominio_id = %s
+            WHERE a.condominio_id = ?
             ORDER BY a.id DESC
         """
         avisos = db.fetch_all(query, (condominio_id,))
@@ -362,15 +357,15 @@ def create_aviso():
     else:
         condominio_id = data.get('condominio_id')
 
-    # Pega o ID do usuário logado
     criado_por = session.get('user_id')
 
     db.execute_query(
-        "INSERT INTO avisos (titulo, mensagem, tipo, data_criacao, condominio_id, criado_por) VALUES (%s, %s, %s, %s, %s, %s)",
+        "INSERT INTO avisos (titulo, mensagem, tipo, data_criacao, condominio_id, criado_por) VALUES (?, ?, ?, ?, ?, ?)",
         (data.get('titulo'), data.get('mensagem'), data.get('tipo'),
          datetime.now().strftime('%Y-%m-%d %H:%M:%S'), condominio_id, criado_por)
     )
     return jsonify({'success': True, 'message': 'Aviso publicado com sucesso!'})
+
 
 @app.route('/api/avisos/<int:id>', methods=['PUT'])
 @login_required
@@ -380,8 +375,8 @@ def update_aviso(id):
         data = request.get_json()
         db.execute_query("""
             UPDATE avisos 
-            SET titulo = %s, mensagem = %s, tipo = %s, ativo = %s
-            WHERE id = %s
+            SET titulo = ?, mensagem = ?, tipo = ?, ativo = ?
+            WHERE id = ?
         """, (data.get('titulo'), data.get('mensagem'), data.get('tipo'),
               data.get('ativo', 1), id))
         return jsonify({'success': True, 'message': 'Aviso atualizado com sucesso!'})
@@ -394,7 +389,7 @@ def update_aviso(id):
 @master_required
 def delete_aviso(id):
     try:
-        db.execute_query("DELETE FROM avisos WHERE id = %s", (id,))
+        db.execute_query("DELETE FROM avisos WHERE id = ?", (id,))
         return jsonify({'success': True, 'message': 'Aviso removido com sucesso!'})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
@@ -413,7 +408,7 @@ def get_ocorrencias():
             FROM ocorrencias o
             LEFT JOIN condominios c ON o.condominio_id = c.id
             LEFT JOIN usuarios u ON o.criado_por = u.id
-            WHERE o.condominio_id = %s
+            WHERE o.condominio_id = ?
             ORDER BY o.id DESC
         """
         ocorrencias = db.fetch_all(query, (condominio_id,))
@@ -434,70 +429,109 @@ def get_ocorrencias():
 @app.route('/api/ocorrencias', methods=['POST'])
 @login_required
 def create_ocorrencia():
+    data = request.get_json()
+
+    if session.get('user_tipo') == 'porteiro':
+        condominio_id = session.get('user_condominio_id')
+    else:
+        condominio_id = data.get('condominio_id')
+
+    criado_por = session.get('user_id')
+
+    db.execute_query("""
+        INSERT INTO ocorrencias (titulo, descricao, tipo, prioridade, status, data_criacao, condominio_id, responsavel, criado_por) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (data.get('titulo'), data.get('descricao'), data.get('tipo'),
+          data.get('prioridade'), 'aberto', datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+          condominio_id, data.get('responsavel'), criado_por))
+    return jsonify({'success': True, 'message': 'Ocorrência registrada com sucesso!'})
+
+
+@app.route('/api/ocorrencias/<int:id>', methods=['PUT'])
+@login_required
+@master_required
+def update_ocorrencia(id):
     try:
         data = request.get_json()
-        print(f"📝 Dados recebidos: {data}")  # Log para debug
-
-        if session.get('user_tipo') == 'porteiro':
-            condominio_id = session.get('user_condominio_id')
-        else:
-            condominio_id = data.get('condominio_id', 1)  # Valor padrão
-
-        criado_por = session.get('user_id')
-
-        # Verificar se os campos obrigatórios existem
-        titulo = data.get('titulo')
-        descricao = data.get('descricao')
-
-        if not titulo or not descricao:
-            return jsonify({'success': False, 'error': 'Título e descrição são obrigatórios!'}), 400
-
-        tipo = data.get('tipo', 'reclamacao')
-        prioridade = data.get('prioridade', 'media')
-        status = data.get('status', 'aberto')
-        responsavel = data.get('responsavel', '')
-
-        query = """
-            INSERT INTO ocorrencias (titulo, descricao, tipo, prioridade, status, data_criacao, condominio_id, responsavel, criado_por) 
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-        """
-
-        db.execute_query(query, (
-            titulo, descricao, tipo, prioridade, status,
-            datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-            condominio_id, responsavel, criado_por
-        ))
-
-        print("✅ Ocorrência criada com sucesso!")
-        return jsonify({'success': True, 'message': 'Ocorrência registrada com sucesso!'})
-
+        db.execute_query("""
+            UPDATE ocorrencias 
+            SET titulo = ?, descricao = ?, tipo = ?, status = ?, prioridade = ?
+            WHERE id = ?
+        """, (data.get('titulo'), data.get('descricao'), data.get('tipo'),
+              data.get('status'), data.get('prioridade'), id))
+        return jsonify({'success': True, 'message': 'Ocorrência atualizada com sucesso!'})
     except Exception as e:
-        print(f"❌ Erro ao criar ocorrência: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return jsonify({'success': False, 'error': str(e)})
 
+
+@app.route('/api/ocorrencias/<int:id>', methods=['DELETE'])
+@login_required
+@master_required
+def delete_ocorrencia(id):
+    try:
+        db.execute_query("DELETE FROM ocorrencias WHERE id = ?", (id,))
+        return jsonify({'success': True, 'message': 'Ocorrência removida com sucesso!'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+
+# ==================== PORTEIROS ====================
 @app.route('/api/porteiros', methods=['GET'])
 @login_required
 @master_required
 def get_porteiros():
-    try:
-        query = """
-            SELECT u.id, u.nome, u.login, u.ativo, u.condominio_id, 
-                   IFNULL(c.nome, 'Não definido') as condominio_nome 
-            FROM usuarios u 
-            LEFT JOIN condominios c ON u.condominio_id = c.id 
-            WHERE u.tipo = 'porteiro'
-            ORDER BY u.nome
-        """
-        porteiros = db.fetch_all(query)
-        print(f"📋 Porteiros encontrados: {len(porteiros)}")
-        return jsonify({'success': True, 'porteiros': porteiros})
-    except Exception as e:
-        print(f"❌ Erro ao buscar porteiros: {str(e)}")
-        return jsonify({'success': False, 'error': str(e)}), 500
+    query = """
+        SELECT u.id, u.nome, u.login, u.ativo, u.condominio_id, c.nome as condominio_nome 
+        FROM usuarios u 
+        LEFT JOIN condominios c ON u.condominio_id = c.id 
+        WHERE u.tipo = 'porteiro'
+        ORDER BY u.nome
+    """
+    porteiros = db.fetch_all(query)
+    return jsonify({'success': True, 'porteiros': porteiros})
 
 
+@app.route('/api/porteiros', methods=['POST'])
+@login_required
+@master_required
+def create_porteiro():
+    data = request.get_json()
+    senha_hash = hashlib.sha256(data['senha'].encode()).hexdigest()
+    db.execute_query(
+        "INSERT INTO usuarios (nome, login, senha, tipo, condominio_id, ativo) VALUES (?, ?, ?, 'porteiro', ?, ?)",
+        (data['nome'], data['login'], senha_hash, data.get('condominio_id'), 1 if data.get('ativo') else 0)
+    )
+    return jsonify({'success': True, 'message': 'Porteiro cadastrado com sucesso!'})
+
+
+@app.route('/api/porteiros/<int:id>', methods=['PUT'])
+@login_required
+@master_required
+def update_porteiro(id):
+    data = request.get_json()
+    if data.get('senha'):
+        senha_hash = hashlib.sha256(data['senha'].encode()).hexdigest()
+        db.execute_query(
+            "UPDATE usuarios SET nome=?, login=?, senha=?, condominio_id=?, ativo=? WHERE id=? AND tipo='porteiro'",
+            (data['nome'], data['login'], senha_hash, data.get('condominio_id'), 1 if data.get('ativo') else 0, id)
+        )
+    else:
+        db.execute_query(
+            "UPDATE usuarios SET nome=?, login=?, condominio_id=?, ativo=? WHERE id=? AND tipo='porteiro'",
+            (data['nome'], data['login'], data.get('condominio_id'), 1 if data.get('ativo') else 0, id)
+        )
+    return jsonify({'success': True, 'message': 'Porteiro atualizado com sucesso!'})
+
+
+@app.route('/api/porteiros/<int:id>', methods=['DELETE'])
+@login_required
+@master_required
+def delete_porteiro(id):
+    db.execute_query("DELETE FROM usuarios WHERE id=? AND tipo='porteiro'", (id,))
+    return jsonify({'success': True, 'message': 'Porteiro removido com sucesso!'})
+
+
+# ==================== RELATÓRIOS EXCEL ====================
 @app.route('/api/relatorio_registros', methods=['GET'])
 @login_required
 @master_required
@@ -505,7 +539,7 @@ def relatorio_registros():
     try:
         from openpyxl import Workbook
         from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
-        from datetime import datetime
+        from openpyxl.utils import get_column_letter
         import io
 
         query = """
@@ -555,11 +589,8 @@ def relatorio_registros():
             data_hora = reg.get('data_entrada', '')
             if data_hora:
                 try:
-                    if isinstance(data_hora, datetime):
-                        data_formatada = data_hora.strftime('%d/%m/%Y %H:%M:%S')
-                    else:
-                        dt = datetime.strptime(str(data_hora), '%Y-%m-%d %H:%M:%S')
-                        data_formatada = dt.strftime('%d/%m/%Y %H:%M:%S')
+                    dt = datetime.strptime(str(data_hora), '%Y-%m-%d %H:%M:%S')
+                    data_formatada = dt.strftime('%d/%m/%Y %H:%M:%S')
                 except:
                     data_formatada = str(data_hora)
             else:
@@ -580,7 +611,7 @@ def relatorio_registros():
 
         col_widths = [8, 20, 35, 15, 15, 18, 25, 25, 40]
         for i, width in enumerate(col_widths, 1):
-            ws.column_dimensions[chr(64 + i)].width = width
+            ws.column_dimensions[get_column_letter(i)].width = width
 
         output = io.BytesIO()
         wb.save(output)
@@ -597,166 +628,73 @@ def relatorio_registros():
 
     except Exception as e:
         print(f"❌ Erro: {str(e)}")
-        import traceback
-        traceback.print_exc()
         return jsonify({'success': False, 'error': str(e)}), 500
 
-
-@app.route('/api/desbloquear_pessoa/<int:id>', methods=['POST'])
-@login_required
-@master_required
-def desbloquear_pessoa(id):
-    try:
-        db.execute_query(
-            "UPDATE pessoas SET status='ATIVO', bloqueado=0, motivo_bloqueio=NULL WHERE id=%s",
-            (id,)
-        )
-        print(f"🔓 Pessoa {id} desbloqueada")
-        return jsonify({'success': True, 'message': 'Pessoa desbloqueada com sucesso!'})
-    except Exception as e:
-        print(f"❌ Erro ao desbloquear: {str(e)}")
-        return jsonify({'success': False, 'error': str(e)}), 500
-
-@app.route('/api/bloquear_pessoa/<int:id>', methods=['POST'])
-@login_required
-@master_required
-def bloquear_pessoa(id):
-    try:
-        data = request.get_json()
-        motivo = data.get('motivo')
-
-        if not motivo:
-            return jsonify({'success': False, 'error': 'Motivo é obrigatório!'}), 400
-
-        # Atualizar os campos de bloqueio
-        db.execute_query(
-            "UPDATE pessoas SET status='BLOQUEADO', bloqueado=1, motivo_bloqueio=%s WHERE id=%s",
-            (motivo, id)
-        )
-        print(f"🔒 Pessoa {id} bloqueada. Motivo: {motivo}")
-        return jsonify({'success': True, 'message': 'Pessoa bloqueada com sucesso!'})
-    except Exception as e:
-        print(f"❌ Erro ao bloquear: {str(e)}")
-        return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/relatorio_pessoas', methods=['GET'])
 @login_required
 @master_required
 def relatorio_pessoas():
-    """Gera relatório Excel com todas as pessoas separadas por condomínio"""
     try:
         from openpyxl import Workbook
         from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
         from openpyxl.utils import get_column_letter
         import io
 
-        condominios = db.fetch_all("SELECT id, nome FROM condominios ORDER BY nome")
+        query = """
+            SELECT 
+                p.id, p.nome, p.tipo, p.apartamento, p.telefone,
+                p.documento, p.veiculo_placa, p.veiculo_modelo,
+                p.status, p.motivo_bloqueio, c.nome as condominio_nome
+            FROM pessoas p
+            LEFT JOIN condominios c ON p.condominio_id = c.id
+            ORDER BY c.nome, p.nome
+        """
 
-        if not condominios:
-            return jsonify({'success': False, 'error': 'Nenhum condomínio encontrado'}), 404
+        pessoas = db.fetch_all(query)
+
+        if not pessoas:
+            return jsonify({'success': False, 'error': 'Nenhuma pessoa encontrada'}), 404
 
         wb = Workbook()
-        wb.remove(wb.active)
+        ws = wb.active
+        ws.title = "Pessoas"
 
-        cores = ['4472C4', '2E7D32', 'ED7D31', '9B59B6', 'E74C3C', '1ABC9C', 'F39C12', '3498DB', '27AE60', '8E44AD']
+        header_font = Font(name='Arial', size=12, bold=True, color='FFFFFF')
+        header_fill = PatternFill(start_color='2E7D32', end_color='2E7D32', fill_type='solid')
+        header_alignment = Alignment(horizontal='center', vertical='center')
+        border = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'),
+                        bottom=Side(style='thin'))
 
-        header_font = Font(name='Calibri', size=11, bold=True, color='FFFFFF')
-        header_alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
-        cell_alignment = Alignment(horizontal='left', vertical='center')
-        center_alignment = Alignment(horizontal='center', vertical='center')
+        headers = ['ID', 'NOME', 'TIPO', 'APARTAMENTO', 'TELEFONE', 'DOCUMENTO', 'PLACA', 'MODELO', 'CONDOMÍNIO',
+                   'STATUS', 'MOTIVO']
 
-        border = Border(
-            left=Side(style='thin'),
-            right=Side(style='thin'),
-            top=Side(style='thin'),
-            bottom=Side(style='thin')
-        )
+        for col, header in enumerate(headers, 1):
+            cell = ws.cell(row=1, column=col, value=header)
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.alignment = header_alignment
+            cell.border = border
 
-        data_relatorio = datetime.now().strftime('%d/%m/%Y %H:%M:%S')
+        for row_idx, pessoa in enumerate(pessoas, 2):
+            ws.cell(row=row_idx, column=1, value=pessoa.get('id', ''))
+            ws.cell(row=row_idx, column=2, value=pessoa.get('nome', ''))
+            ws.cell(row=row_idx, column=3, value=pessoa.get('tipo', ''))
+            ws.cell(row=row_idx, column=4, value=pessoa.get('apartamento', ''))
+            ws.cell(row=row_idx, column=5, value=pessoa.get('telefone', ''))
+            ws.cell(row=row_idx, column=6, value=pessoa.get('documento', ''))
+            ws.cell(row=row_idx, column=7, value=pessoa.get('veiculo_placa', ''))
+            ws.cell(row=row_idx, column=8, value=pessoa.get('veiculo_modelo', ''))
+            ws.cell(row=row_idx, column=9, value=pessoa.get('condominio_nome', ''))
+            ws.cell(row=row_idx, column=10, value=pessoa.get('status', 'ATIVO'))
+            ws.cell(row=row_idx, column=11, value=pessoa.get('motivo_bloqueio', ''))
 
-        for idx, cond in enumerate(condominios):
-            query = """
-                SELECT 
-                    p.id, p.nome, p.tipo, p.apartamento, p.telefone,
-                    p.documento, p.veiculo_placa, p.veiculo_modelo,
-                    p.status, p.motivo_bloqueio
-                FROM pessoas p
-                WHERE p.condominio_id = %s
-                ORDER BY p.nome
-            """
-            pessoas = db.fetch_all(query, (cond['id'],))
+            for col in range(1, 12):
+                ws.cell(row=row_idx, column=col).border = border
 
-            sheet_name = cond['nome'][:31]
-            ws = wb.create_sheet(title=sheet_name)
-
-            cor_cabecalho = cores[idx % len(cores)]
-            header_fill = PatternFill(start_color=cor_cabecalho, end_color=cor_cabecalho, fill_type='solid')
-
-            # Título
-            ws.merge_cells('A1:J1')
-            ws['A1'] = f"{cond['nome'].upper()} - RELATÓRIO DE PESSOAS"
-            ws['A1'].font = Font(name='Calibri', size=16, bold=True, color=cor_cabecalho)
-            ws['A1'].alignment = Alignment(horizontal='center')
-
-            # Data
-            ws.merge_cells('A2:J2')
-            ws['A2'] = f"Gerado em: {data_relatorio}"
-            ws['A2'].font = Font(name='Calibri', size=10, italic=True, color='666666')
-            ws['A2'].alignment = Alignment(horizontal='center')
-
-            # Quantidade
-            ws.merge_cells('A3:J3')
-            ws['A3'] = f"Total de pessoas: {len(pessoas)}"
-            ws['A3'].font = Font(name='Calibri', size=11, bold=True)
-            ws['A3'].alignment = Alignment(horizontal='center')
-            ws['A3'].fill = PatternFill(start_color='F5F5F5', end_color='F5F5F5', fill_type='solid')
-
-            # Cabeçalhos
-            headers = ['ID', 'NOME', 'TIPO', 'APARTAMENTO', 'TELEFONE', 'DOCUMENTO', 'PLACA', 'MODELO', 'STATUS',
-                       'MOTIVO']
-
-            row_cabecalho = 4
-            for col, header in enumerate(headers, 1):
-                cell = ws.cell(row=row_cabecalho, column=col, value=header)
-                cell.font = header_font
-                cell.fill = header_fill
-                cell.alignment = header_alignment
-                cell.border = border
-
-            if pessoas:
-                for row_idx, pessoa in enumerate(pessoas, row_cabecalho + 1):
-                    ws.cell(row=row_idx, column=1, value=pessoa.get('id', ''))
-                    ws.cell(row=row_idx, column=2, value=pessoa.get('nome', ''))
-                    ws.cell(row=row_idx, column=3, value=pessoa.get('tipo', ''))
-                    ws.cell(row=row_idx, column=4, value=pessoa.get('apartamento', ''))
-                    ws.cell(row=row_idx, column=5, value=pessoa.get('telefone', ''))
-                    ws.cell(row=row_idx, column=6, value=pessoa.get('documento', ''))
-                    ws.cell(row=row_idx, column=7, value=pessoa.get('veiculo_placa', ''))
-                    ws.cell(row=row_idx, column=8, value=pessoa.get('veiculo_modelo', ''))
-                    ws.cell(row=row_idx, column=9, value=pessoa.get('status', 'ATIVO'))
-                    ws.cell(row=row_idx, column=10, value=pessoa.get('motivo_bloqueio', ''))
-
-                    for col in range(1, 11):
-                        cell = ws.cell(row=row_idx, column=col)
-                        cell.border = border
-                        if col in [1, 3, 4, 9]:
-                            cell.alignment = center_alignment
-                        else:
-                            cell.alignment = cell_alignment
-                        if row_idx % 2 == 0:
-                            cell.fill = PatternFill(start_color='F8F9FA', end_color='F8F9FA', fill_type='solid')
-            else:
-                ws.merge_cells(f'A{row_cabecalho + 1}:J{row_cabecalho + 1}')
-                ws.cell(row=row_cabecalho + 1, column=1, value="NENHUMA PESSOA CADASTRADA")
-                ws.cell(row=row_cabecalho + 1, column=1).font = Font(italic=True, color='999999')
-                ws.cell(row=row_cabecalho + 1, column=1).alignment = Alignment(horizontal='center')
-
-            col_widths = [8, 40, 15, 15, 18, 20, 15, 18, 12, 30]
-            for i, width in enumerate(col_widths, 1):
-                ws.column_dimensions[get_column_letter(i)].width = width
-
-            ws.row_dimensions[row_cabecalho].height = 25
-            ws.freeze_panes = f'A{row_cabecalho + 1}'
+        col_widths = [8, 40, 15, 15, 18, 20, 15, 18, 25, 12, 30]
+        for i, width in enumerate(col_widths, 1):
+            ws.column_dimensions[get_column_letter(i)].width = width
 
         output = io.BytesIO()
         wb.save(output)
@@ -802,7 +740,8 @@ if __name__ == '__main__':
     print("=" * 60)
     print("🚀 SERVIDOR INICIADO")
     print("📱 Acesse: http://localhost:5000")
-    print("👔 Porteiro: joao (credenciais fornecidas pelo administrador)")
-    print("👔 Porteiro: maria (credenciais fornecidas pelo administrador)")
+    print("🔑 Master: master / admin123")
+    print("👔 Porteiro: joao / 123456 (Condomínio 1)")
+    print("👔 Porteiro: maria / 123456 (Condomínio 2)")
     print("=" * 60)
     app.run(debug=True, host='0.0.0.0', port=5000)
