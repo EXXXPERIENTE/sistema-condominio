@@ -745,3 +745,48 @@ if __name__ == '__main__':
     print("👔 Porteiro: maria / 123456 (Condomínio 2)")
     print("=" * 60)
     app.run(debug=True, host='0.0.0.0', port=5000)
+
+
+    # ==================== RECEBIMENTOS ====================
+    @app.route('/api/recebimentos', methods=['GET'])
+    @login_required
+    def get_recebimentos():
+        query = """
+            SELECT r.*, p.nome as pessoa_nome, p.apartamento, p.bloco, p.cor
+            FROM recebimentos r
+            JOIN registros rg ON r.registro_id = rg.id
+            JOIN pessoas p ON rg.pessoa_id = p.id
+            ORDER BY r.data_recebimento DESC
+            LIMIT 50
+        """
+        recebimentos = db.fetch_all(query)
+        return jsonify({'success': True, 'recebimentos': recebimentos})
+
+
+    @app.route('/api/recebimentos/<int:id>', methods=['PUT'])
+    @login_required
+    def atualizar_recebimento(id):
+        data = request.get_json()
+        db.execute_query("""
+            UPDATE recebimentos 
+            SET status = ?, recebido_por = ?, data_recebimento = ?
+            WHERE id = ?
+        """, (data.get('status'), session.get('user_nome'), datetime.now().strftime('%Y-%m-%d %H:%M:%S'), id))
+        return jsonify({'success': True, 'message': 'Status atualizado!'})
+
+
+    # ==================== ESTATÍSTICAS POR COR ====================
+    @app.route('/api/estatisticas_cores', methods=['GET'])
+    @login_required
+    @master_required
+    def get_estatisticas_cores():
+        query = """
+            SELECT cor, COUNT(*) as total 
+            FROM pessoas 
+            WHERE cor IS NOT NULL 
+            GROUP BY cor
+            ORDER BY total DESC
+        """
+        cores = db.fetch_all(query)
+        return jsonify({'success': True, 'cores': cores})
+

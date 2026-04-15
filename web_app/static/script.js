@@ -1331,4 +1331,30 @@ window.bloquearPessoa = function(id, nome) {
 };
 
 
+// ==================== CORES E IDENTIFICAÇÃO ====================
+function getCorByTipo(tipo) {
+    const cores = {
+        'morador': '#2ecc71',    // Verde
+        'visitante': '#3498db',   // Azul
+        'entregador': '#f39c12',  // Laranja
+        'tecnico': '#9b59b6',     // Roxo
+        'bloqueado': '#e74c3c'    // Vermelho
+    };
+    return cores[tipo] || '#95a5a6';
+}
+
+function getCorByBloco(bloco) {
+    const coresBloco = {
+        'A': '#e74c3c',  // Vermelho
+        'B': '#3498db',  // Azul
+        'C': '#2ecc71',  // Verde
+        'D': '#f39c12',  // Laranja
+        'E': '#9b59b6'   // Roxo
+    };
+    return coresBloco[bloco] || '#95a5a6';
+}
+
+// Modificar a função carregarPessoas para mostrar cores
+// (adicione style="border-left: 4px solid {cor};" no card)
+
 console.log('✅ App carregado com sucesso!');
