@@ -225,6 +225,10 @@ async function carregarPessoas() {
 }
 
 function abrirModalPessoa() {
+    console.log("🔧 abrirModalPessoa chamada");
+    console.log("User:", user);
+
+    // Limpar todos os campos
     document.getElementById('modalTitle').innerText = 'Nova Pessoa';
     document.getElementById('pessoaId').value = '';
     document.getElementById('pessoaNome').value = '';
@@ -234,28 +238,58 @@ function abrirModalPessoa() {
     document.getElementById('pessoaDocumento').value = '';
     document.getElementById('pessoaVeiculo').value = '';
 
+    // Configurar campo de condomínio
     const selectCondominio = document.getElementById('pessoaCondominio');
-    if (user && user.tipo === 'master') {
-        selectCondominio.style.display = 'block';
-        carregarCondominiosParaSelectPessoa();
+
+    if (selectCondominio) {
+        if (user && user.tipo === 'master') {
+            console.log("✅ Usuário é master, mostrando campo condomínio");
+            selectCondominio.style.display = 'block';
+            selectCondominio.style.visibility = 'visible';
+            selectCondominio.style.opacity = '1';
+            carregarCondominiosParaSelectPessoa();
+        } else {
+            console.log("❌ Usuário não é master, escondendo campo condomínio");
+            selectCondominio.style.display = 'none';
+        }
     } else {
-        selectCondominio.style.display = 'none';
+        console.error("❌ Elemento 'pessoaCondominio' não encontrado!");
     }
 
-    document.getElementById('modalPessoa').classList.add('active');
+    // Abrir o modal
+    const modal = document.getElementById('modalPessoa');
+    if (modal) {
+        modal.classList.add('active');
+        console.log("✅ Modal aberto");
+    } else {
+        console.error("❌ Modal 'modalPessoa' não encontrado!");
+    }
 }
 
 async function carregarCondominiosParaSelectPessoa() {
+    console.log("🔧 Carregando condomínios para select...");
     try {
         const response = await fetch('/api/condominios');
         const data = await response.json();
+        console.log("Condomínios recebidos:", data);
+
         if (data.success && data.condominios) {
             const select = document.getElementById('pessoaCondominio');
-            select.innerHTML = '<option value="">Selecione um condomínio</option>' +
-                data.condominios.map(c => `<option value="${c.id}">${escapeHtml(c.nome)}</option>`).join('');
+            if (select) {
+                select.innerHTML = '<option value="">Selecione um condomínio</option>' +
+                    data.condominios.map(c => `<option value="${c.id}">${escapeHtml(c.nome)}</option>`).join('');
+                console.log("✅ Select populado com", data.condominios.length, "condomínios");
+            } else {
+                console.error("❌ Select 'pessoaCondominio' não encontrado");
+            }
+        } else {
+            console.error("❌ Erro ao carregar condomínios:", data);
         }
-    } catch (error) {}
+    } catch (error) {
+        console.error("❌ Erro ao carregar condomínios:", error);
+    }
 }
+
 
 function fecharModal(modalId) {
     document.getElementById(modalId).classList.remove('active');
