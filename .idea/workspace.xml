@@ -5,14 +5,13 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="b19bb8c3-6e4f-40e4-a1e8-e784c75f9feb" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/criar_tabelas_faltantes.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/testar_banco.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/web_app/templates/indexbackup.html" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/init_db_on_render.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/condominio.db" beforeDir="false" afterPath="$PROJECT_DIR$/condominio.db" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/web_app/api.py" beforeDir="false" afterPath="$PROJECT_DIR$/web_app/api.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/web_app/static/script.js" beforeDir="false" afterPath="$PROJECT_DIR$/web_app/static/script.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/web_app/templates/index.html" beforeDir="false" afterPath="$PROJECT_DIR$/web_app/templates/index.html" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app.py" beforeDir="false" afterPath="$PROJECT_DIR$/app.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/condominio.db" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/database/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/database/__init__.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/database/init_db.py" beforeDir="false" afterPath="$PROJECT_DIR$/database/init_db.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/popular_postgres.py" beforeDir="false" afterPath="$PROJECT_DIR$/popular_postgres.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -54,6 +53,7 @@
     "Python.criar_tabelas_faltantes.executor": "Run",
     "Python.main (1).executor": "Run",
     "Python.main_window.executor": "Run",
+    "Python.popular_banco_completo.executor": "Run",
     "Python.popular_sqlite.executor": "Run",
     "Python.povoar_banco.executor": "Run",
     "Python.testar_login.executor": "Run",
@@ -61,10 +61,15 @@
     "RunOnceActivity.ShowReadmeOnStart": "true",
     "RunOnceActivity.git.unshallow": "true",
     "git-widget-placeholder": "main",
-    "last_opened_file_path": "C:/APPPY/Segurança"
+    "last_opened_file_path": "D:/APPPY/Gestor_Sindico"
   }
 }]]></component>
-  <component name="RunManager" selected="Python.criar_tabelas_faltantes">
+  <component name="RecentsManager">
+    <key name="CopyFile.RECENT_KEYS">
+      <recent name="D:\APPPY\Gestor_Sindico" />
+    </key>
+  </component>
+  <component name="RunManager" selected="Python.popular_banco_completo">
     <configuration name="atualizar_banco" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
       <module name="Segurança" />
       <option name="ENV_FILES" value="" />
@@ -79,28 +84,6 @@
       <option name="ADD_CONTENT_ROOTS" value="true" />
       <option name="ADD_SOURCE_ROOTS" value="true" />
       <option name="SCRIPT_NAME" value="$PROJECT_DIR$/atualizar_banco.py" />
-      <option name="PARAMETERS" value="" />
-      <option name="SHOW_COMMAND_LINE" value="false" />
-      <option name="EMULATE_TERMINAL" value="false" />
-      <option name="MODULE_MODE" value="false" />
-      <option name="REDIRECT_INPUT" value="false" />
-      <option name="INPUT_FILE" value="" />
-      <method v="2" />
-    </configuration>
-    <configuration name="corrigir_banco" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
-      <module name="Segurança" />
-      <option name="ENV_FILES" value="" />
-      <option name="INTERPRETER_OPTIONS" value="" />
-      <option name="PARENT_ENVS" value="true" />
-      <envs>
-        <env name="PYTHONUNBUFFERED" value="1" />
-      </envs>
-      <option name="SDK_HOME" value="" />
-      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/web_app" />
-      <option name="IS_MODULE_SDK" value="true" />
-      <option name="ADD_CONTENT_ROOTS" value="true" />
-      <option name="ADD_SOURCE_ROOTS" value="true" />
-      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/web_app/corrigir_banco.py" />
       <option name="PARAMETERS" value="" />
       <option name="SHOW_COMMAND_LINE" value="false" />
       <option name="EMULATE_TERMINAL" value="false" />
@@ -175,6 +158,28 @@
       <option name="INPUT_FILE" value="" />
       <method v="2" />
     </configuration>
+    <configuration name="popular_banco_completo" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
+      <module name="Gestor_Sindico" />
+      <option name="ENV_FILES" value="" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/popular_banco_completo.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
     <configuration name="popular_sqlite" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
       <module name="Segurança" />
       <option name="ENV_FILES" value="" />
@@ -199,11 +204,11 @@
     </configuration>
     <recent_temporary>
       <list>
+        <item itemvalue="Python.popular_banco_completo" />
         <item itemvalue="Python.criar_tabelas_faltantes" />
         <item itemvalue="Python.atualizar_banco" />
         <item itemvalue="Python.criar_banco_sqlite" />
         <item itemvalue="Python.popular_sqlite" />
-        <item itemvalue="Python.corrigir_banco" />
       </list>
     </recent_temporary>
   </component>

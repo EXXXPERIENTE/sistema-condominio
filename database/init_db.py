@@ -1,71 +1,37 @@
 ﻿import psycopg2
-import psycopg2.extras
-import bcrypt
 import os
-from dotenv import load_dotenv
-from contextlib import contextmanager
-import urllib.parse as urlparse
-
-load_dotenv()
+import bcrypt
+from psycopg2.extras import RealDictCursor
+import sys
 
 
-def get_db_config():
-    """Retorna configuração do banco para Render"""
-
-    # Para Render (PostgreSQL)
-    database_url = os.environ.get('DATABASE_URL')
-
-    if database_url:
-        # Parse da URL do banco
-        result = urlparse.urlparse(database_url)
-        return {
-            'host': result.hostname,
-            'database': result.path[1:],
-            'user': result.username,
-            'password': result.password,
-            'port': result.port or 5432
-        }
-
-    # Desenvolvimento local
-    return {
-        'host': os.environ.get('DB_HOST', 'localhost'),
-        'database': os.environ.get('DB_NAME', 'condominio_db'),
-        'user': os.environ.get('DB_USER', 'condominio_user'),
-        'password': os.environ.get('DB_PASSWORD', 'Condominio@2024'),
-        'port': os.environ.get('DB_PORT', 5432)
-    }
-
-
+# Configuração do banco de dados
 def get_db_connection():
     """Retorna conexão com PostgreSQL"""
-    config = get_db_config()
 
-    try:
+    # Para produção (PythonAnywhere)
+    if 'PYTHONANYWHERE_DOMAIN' in os.environ:
         conn = psycopg2.connect(
-            host=config['host'],
-            database=config['database'],
-            user=config['user'],
-            password=config['password'],
-            port=config['port']
+            host=os.environ.get('DB_HOST', 'seuusuario.postgres.pythonanywhere-services.com'),
+            database=os.environ.get('DB_NAME', 'seuusuario$condominio'),
+            user=os.environ.get('DB_USER', 'seuusuario'),
+            password=os.environ.get('DB_PASSWORD', 'sua_senha')
         )
-        return conn
-    except Exception as e:
-        print(f"❌ Erro ao conectar ao PostgreSQL: {e}")
-        raise
+    else:
+        # Para desenvolvimento local
+        conn = psycopg2.connect(
+            host='localhost',
+            database='condominio_db',
+            user='condominio_user',
+            password='sua_senha_forte'
+        )
+
+    return conn
 
 
-@contextmanager
 def get_db():
-    """Context manager para conexão com banco"""
-    conn = get_db_connection()
-    try:
-        yield conn
-        conn.commit()
-    except Exception as e:
-        conn.rollback()
-        raise e
-    finally:
-        conn.close()
+    """Retorna conexão (compatível com código existente)"""
+    return get_db_connection()
 
 
 def hash_senha(senha):
@@ -81,11 +47,10 @@ def init_db():
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    print("=" * 60)
-    print("  INICIALIZANDO BANCO DE DADOS POSTGRESQL")
-    print("=" * 60)
+    # Criar extensão UUID (opcional)
+    cursor.execute('CREATE EXTENSION IF NOT EXISTS "uuid-ossp";')
 
-    # Criar tabela usuarios
+    # Tabela de usuarios
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS usuarios (
             id SERIAL PRIMARY KEY,
@@ -114,7 +79,7 @@ def init_db():
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS pessoas (
             id SERIAL PRIMARY KEY,
-            condominio_id INTEGER NOT NULL,
+            condominio_id INTEGER NOT NULL REFERENCES condominios(id) ON DELETE CASCADE,
             tipo TEXT NOT NULL,
             nome TEXT NOT NULL,
             documento TEXT,
@@ -123,8 +88,7 @@ def init_db():
             casa TEXT,
             observacao TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (condominio_id) REFERENCES condominios(id) ON DELETE CASCADE
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
 
@@ -132,8 +96,8 @@ def init_db():
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS registros (
             id SERIAL PRIMARY KEY,
-            condominio_id INTEGER NOT NULL,
-            pessoa_id INTEGER,
+            condominio_id INTEGER NOT NULL REFERENCES condominios(id) ON DELETE CASCADE,
+            pessoa_id INTEGER REFERENCES pessoas(id) ON DELETE SET NULL,
             tipo TEXT NOT NULL,
             titulo TEXT NOT NULL,
             descricao TEXT,
@@ -151,19 +115,16 @@ def init_db():
             quem_retirou TEXT,
             quem_liberou TEXT,
             registrado_por TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (condominio_id) REFERENCES condominios(id) ON DELETE CASCADE,
-            FOREIGN KEY (pessoa_id) REFERENCES pessoas(id) ON DELETE SET NULL
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
 
-    # Criar índices
+    # Criar índices para performance
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_pessoas_condominio ON pessoas(condominio_id);')
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_registros_condominio ON registros(condominio_id);')
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_registros_data ON registros(data_hora DESC);')
-    cursor.execute('CREATE INDEX IF NOT EXISTS idx_usuarios_email ON usuarios(email);')
 
-    # Criar usuario master
+    # Verificar se existe usuario master
     cursor.execute("SELECT COUNT(*) FROM usuarios WHERE perfil = 'MASTER'")
     if cursor.fetchone()[0] == 0:
         cursor.execute('''
@@ -175,27 +136,5 @@ def init_db():
     conn.commit()
     cursor.close()
     conn.close()
-
     print("✅ Banco de dados PostgreSQL inicializado com sucesso!")
     print("🔑 Login Master: master@condominio.com / 123456")
-    print("=" * 60)
-
-
-def verificar_conexao():
-    """Verifica se a conexão com o banco está funcionando"""
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute("SELECT version();")
-        version = cursor.fetchone()[0]
-        cursor.close()
-        conn.close()
-        print(f"✅ Conectado ao PostgreSQL: {version[:50]}...")
-        return True
-    except Exception as e:
-        print(f"❌ Erro na conexão: {e}")
-        return False
-
-
-if __name__ == "__main__":
-    verificar_conexao()

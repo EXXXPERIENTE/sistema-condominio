@@ -8,6 +8,20 @@ import json
 from datetime import datetime
 import shutil
 
+# No início do app.py, depois de criar o app
+def init_database():
+    try:
+        from database.init_db import init_db
+        init_db()
+        print("✅ Banco inicializado")
+    except Exception as e:
+        print(f"⚠️ Erro ao inicializar: {e}")
+
+# Chamar a função
+init_database()
+
+
+
 # Carregar variáveis de ambiente
 try:
     from dotenv import load_dotenv
