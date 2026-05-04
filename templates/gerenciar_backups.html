@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gerenciar Backups - Master</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+
+        .header h1 { font-size: 24px; color: #2c3e50; }
+        .header h1 span { color: #667eea; }
+
+        .btn-voltar {
+            background: #2c3e50;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            text-decoration: none;
+            transition: all 0.3s;
+        }
+
+        .btn-voltar:hover {
+            background: #1a252f;
+            transform: translateY(-2px);
+        }
+
+        .btn-sair {
+            background: #e74c3c;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            text-decoration: none;
+            margin-left: 10px;
+        }
+
+        .acoes {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: #3498db;
+            color: white;
+        }
+
+        .btn-success {
+            background: #2ecc71;
+            color: white;
+        }
+
+        .btn-danger {
+            background: #e74c3c;
+            color: white;
+        }
+
+        .btn-warning {
+            background: #f39c12;
+            color: white;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            filter: brightness(1.05);
+        }
+
+        .card {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+
+        .card h2 {
+            margin-bottom: 15px;
+            color: #2c3e50;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 10px;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 28px;
+            font-weight: bold;
+            color: #3498db;
+        }
+
+        .table-container {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+
+        th {
+            background: #34495e;
+            color: white;
+        }
+
+        tr:hover {
+            background: #f5f5f5;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            width: 90%;
+            max-width: 400px;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .close {
+            font-size: 28px;
+            cursor: pointer;
+            color: #999;
+        }
+
+        .close:hover { color: #e74c3c; }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+
+        .alert {
+            padding: 12px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+        }
+
+        .alert-success { background: #d4edda; color: #155724; }
+        .alert-error { background: #f8d7da; color: #721c24; }
+
+        @media (max-width: 768px) {
+            .acoes { flex-direction: column; }
+            .stats { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>💾 <span>GERENCIAR BACKUPS</span></h1>
+            <div>
+                <a href="/master" class="btn-voltar">← Voltar ao Dashboard</a>
+                <a href="/logout" class="btn-sair">Sair</a>
+            </div>
+        </div>
+
+        <div class="stats">
+            <div class="stat-card">
+                <div class="stat-number" id="total-backups">0</div>
+                <div>Backups Disponíveis</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="tamanho-total">0 KB</div>
+                <div>Tamanho Total</div>
+            </div>
+        </div>
+
+        <div class="acoes">
+            <button class="btn btn-primary" onclick="criarBackup()">📀 CRIAR NOVO BACKUP</button>
+            <button class="btn btn-danger" onclick="zerarBancoCompleto()">🗑️ ZERAR BANCO COMPLETO</button>
+        </div>
+
+        <div class="card">
+            <h2>📋 BACKUPS DISPONÍVEIS</h2>
+            <div id="alert-mensagem"></div>
+            <div class="table-container">
+                <table id="tabela-backups">
+                    <thead>
+                        <tr>
+                            <th>Arquivo</th>
+                            <th>Data de Criação</th>
+                            <th>Tamanho</th>
+                            <th>Ações</th>
+
+                    </thead>
+                    <tbody id="backups-tbody">
+                        <tr><td colspan="4" style="text-align:center;">Carregando...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>ℹ️ INFORMAÇÕES</h2>
+            <ul style="margin-left: 20px; color: #666;">
+                <li>✅ Backups são salvos na pasta <strong>backups/</strong> do sistema</li>
+                <li>✅ O backup contém TODOS os dados do sistema</li>
+                <li>✅ Restaurar um backup substitui os dados atuais</li>
+                <li>⚠️ Zerar banco remove TODOS os dados (mantém condomínios e usuário master)</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Modal de Senha -->
+    <div id="modal-senha" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>🔐 CONFIRMAR AÇÃO</h3>
+                <span class="close" onclick="fecharModalSenha()">&times;</span>
+            </div>
+            <div id="modal-senha-mensagem" style="margin-bottom: 15px; color: #e74c3c;"></div>
+            <div class="form-group">
+                <label>Senha do Administrador Master</label>
+                <input type="password" id="senha-confirmacao" placeholder="Digite sua senha">
+            </div>
+            <div style="display: flex; gap: 10px;">
+                <button onclick="confirmarAcao()" class="btn btn-danger" style="flex:1">Confirmar</button>
+                <button onclick="fecharModalSenha()" class="btn btn-primary" style="flex:1">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let acaoPendente = null;
+        let dadosPendentes = null;
+
+        function mostrarMensagem(texto, tipo) {
+            const div = document.getElementById('alert-mensagem');
+            div.innerHTML = `<div class="alert alert-${tipo}">${texto}</div>`;
+            setTimeout(() => { div.innerHTML = ''; }, 5000);
+        }
+
+        // ==================== FECHAR MODAIS ====================
+        function fecharModalSenha() {
+            var modal = document.getElementById('modal-senha');
+            if (modal) {
+                modal.style.display = 'none';
+            }
+            acaoPendente = null;
+            dadosPendentes = null;
+        }
+
+        document.onkeydown = function(event) {
+            if (event.key === 'Escape' || event.key === 'Esc') {
+                fecharModalSenha();
+                return false;
+            }
+        };
+
+        window.onclick = function(event) {
+            var modal = document.getElementById('modal-senha');
+            if (event.target === modal) {
+                fecharModalSenha();
+            }
+        };
+
+
+        function fecharModalSenha() {
+            document.getElementById('modal-senha').style.display = 'none';
+            acaoPendente = null;
+            dadosPendentes = null;
+        }
+
+        function abrirModalSenha(mensagem, acao, dados = null) {
+            document.getElementById('modal-senha-mensagem').innerHTML = mensagem;
+            document.getElementById('senha-confirmacao').value = '';
+            acaoPendente = acao;
+            dadosPendentes = dados;
+            document.getElementById('modal-senha').style.display = 'flex';
+        }
+
+        function confirmarAcao() {
+            const senha = document.getElementById('senha-confirmacao').value;
+            if (!senha) {
+                mostrarMensagem('❌ Digite a senha do administrador!', 'error');
+                return;
+            }
+            if (acaoPendente) {
+                acaoPendente(senha, dadosPendentes);
+            }
+            fecharModalSenha();
+        }
+
+        // Carregar lista de backups
+        function carregarBackups() {
+            fetch('/backup/listar')
+                .then(r => r.json())
+                .then(backups => {
+                    const tbody = document.getElementById('backups-tbody');
+                    document.getElementById('total-backups').innerText = backups.length;
+
+                    let tamanhoTotal = 0;
+                    backups.forEach(b => {
+                        tamanhoTotal += parseFloat(b.tamanho);
+                    });
+                    document.getElementById('tamanho-total').innerText = tamanhoTotal.toFixed(2) + ' KB';
+
+                    if (backups.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">Nenhum backup encontrado</td></tr>';
+                        return;
+                    }
+
+                    tbody.innerHTML = '';
+                    backups.forEach(b => {
+                        const row = tbody.insertRow();
+                        row.insertCell(0).innerText = b.nome;
+                        row.insertCell(1).innerText = b.data;
+                        row.insertCell(2).innerText = b.tamanho;
+                        const acoes = row.insertCell(3);
+                        acoes.innerHTML = `
+                            <button onclick="restaurarBackup('${b.nome}')" class="btn btn-success" style="padding:5px 10px; margin:2px;">🔄 Restaurar</button>
+                            <button onclick="baixarBackup('${b.nome}')" class="btn btn-primary" style="padding:5px 10px; margin:2px;">📥 Baixar</button>
+                            <button onclick="excluirBackup('${b.nome}')" class="btn btn-danger" style="padding:5px 10px; margin:2px;">🗑️ Excluir</button>
+                        `;
+                    });
+                });
+        }
+
+        // Criar backup
+        function criarBackup() {
+            window.open('/backup/banco', '_blank');
+            setTimeout(() => {
+                carregarBackups();
+                mostrarMensagem('✅ Backup criado com sucesso!', 'success');
+            }, 1000);
+        }
+
+        // Restaurar backup
+        function restaurarBackup(nome) {
+            abrirModalSenha(
+                `<strong>Restaurar backup: ${nome}</strong><br><br>⚠️ Isso irá substituir TODOS os dados atuais!<br><br><strong style="color:#e74c3c;">Esta ação é irreversível!</strong>`,
+                (senha) => {
+                    fetch(`/backup/restaurar/${nome}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ senha: senha })
+                    })
+                    .then(r => r.json())
+                    .then(result => {
+                        if(result.error) {
+                            mostrarMensagem('❌ ' + result.error, 'error');
+                        } else {
+                            mostrarMensagem('✅ Backup restaurado com sucesso!', 'success');
+                            setTimeout(() => location.reload(), 1500);
+                        }
+                    });
+                }
+            );
+        }
+
+        // Baixar backup
+        function baixarBackup(nome) {
+            window.open(`/backup/baixar/${nome}`, '_blank');
+        }
+
+        // Excluir backup
+        function excluirBackup(nome) {
+            if (confirm(`⚠️ Tem certeza que deseja excluir o backup "${nome}"?`)) {
+                fetch(`/backup/excluir/${nome}`, { method: 'DELETE' })
+                    .then(r => r.json())
+                    .then(result => {
+                        if(result.error) {
+                            mostrarMensagem('❌ ' + result.error, 'error');
+                        } else {
+                            mostrarMensagem('✅ Backup excluído!', 'success');
+                            carregarBackups();
+                        }
+                    });
+            }
+        }
+
+        // Zerar banco completo
+        function zerarBancoCompleto() {
+            abrirModalSenha(
+                '<strong style="color:#e74c3c;">⚠️ ATENÇÃO EXTREMA!</strong><br><br>' +
+                'Isso irá remover TODOS os dados:<br>' +
+                '• Todas as pessoas cadastradas<br>' +
+                '• Todos os registros (entradas, ocorrências, encomendas)<br>' +
+                '• Todos os porteiros<br><br>' +
+                '<strong>Serão mantidos apenas:</strong><br>' +
+                '• Os condomínios (estrutura)<br>' +
+                '• O usuário Master<br><br>' +
+                '<strong style="color:#e74c3c;">Esta ação é IRREVERSÍVEL!</strong>',
+                (senha) => {
+                    fetch('/api/zerar-banco-completo', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ senha: senha })
+                    })
+                    .then(r => r.json())
+                    .then(result => {
+                        if(result.error) {
+                            mostrarMensagem('❌ ' + result.error, 'error');
+                        } else {
+                            mostrarMensagem('✅ ' + result.message, 'success');
+                            setTimeout(() => carregarBackups(), 2000);
+                        }
+                    });
+                }
+            );
+        }
+
+        // Carregar ao iniciar
+        carregarBackups();
+    </script>
+</body>
+</html>

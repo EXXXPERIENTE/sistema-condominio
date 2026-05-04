@@ -1,0 +1,910 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Master - Gestor de Condomínios</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f0f2f5;
+        }
+
+        .navbar {
+            background: #2c3e50;
+            color: white;
+            padding: 15px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+        }
+        .nav-brand { font-size: 20px; font-weight: bold; }
+        .nav-user { display: flex; align-items: center; gap: 15px; }
+        .btn-logout { background: #e74c3c; color: white; padding: 8px 15px; border-radius: 5px; text-decoration: none; }
+
+        .container { display: flex; margin-top: 60px; min-height: calc(100vh - 60px); }
+
+        .sidebar {
+            width: 280px;
+            background: white;
+            border-right: 1px solid #ddd;
+            padding: 20px;
+            overflow-y: auto;
+            position: fixed;
+            left: 0;
+            top: 60px;
+            bottom: 0;
+        }
+        .sidebar h3 { margin-bottom: 15px; color: #2c3e50; font-size: 14px; }
+        .sidebar-buttons { margin-bottom: 20px; }
+        .btn-sidebar {
+            width: 100%;
+            padding: 10px;
+            margin: 5px 0;
+            background: #ecf0f1;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            text-align: left;
+            font-size: 13px;
+            transition: all 0.3s;
+        }
+        .btn-sidebar:hover { background: #3498db; color: white; }
+        .btn-sidebar a { text-decoration: none; color: inherit; display: block; }
+
+        .cond-item {
+            display: block;
+            width: 100%;
+            padding: 10px;
+            margin: 5px 0;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            text-align: left;
+            font-size: 13px;
+            transition: all 0.3s;
+        }
+        .cond-item:hover { transform: translateX(5px); }
+
+        .main-content { flex: 1; margin-left: 280px; padding: 20px; }
+
+        .content-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .content-header h2 { font-size: 18px; color: #2c3e50; }
+
+        .btn {
+            padding: 8px 15px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.3s;
+        }
+        .btn-primary { background: #3498db; color: white; }
+        .btn-success { background: #2ecc71; color: white; }
+        .btn-danger { background: #e74c3c; color: white; }
+        .btn-warning { background: #f39c12; color: white; }
+        .btn-info { background: #1abc9c; color: white; }
+        .btn:hover { opacity: 0.85; transform: translateY(-1px); }
+
+        .tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 20px;
+            background: white;
+            padding: 8px 12px;
+            border-radius: 12px;
+            flex-wrap: wrap;
+            justify-content: flex-start;
+        }
+        .tab-btn {
+            padding: 8px 16px;
+            border: none;
+            background: #e9ecef;
+            cursor: pointer;
+            font-weight: 600;
+            border-radius: 20px;
+            transition: all 0.2s;
+            font-size: 12px;
+            min-width: 95px;
+            text-align: center;
+        }
+        .tab-btn.active { background: #3498db; color: white; }
+        .tab-btn:hover { background: #3498db; color: white; opacity: 0.8; }
+
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        .table-container { overflow-x: auto; background: white; border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid #eee; }
+        th { background: #34495e; color: white; font-weight: 600; }
+        tr:hover { background: #f8f9fa; }
+
+        .badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 20px;
+            font-size: 10px;
+            font-weight: bold;
+        }
+        .badge-ativo { background: #2ecc71; color: white; }
+        .badge-inativo { background: #e74c3c; color: white; }
+        .badge-aguardando { background: #f39c12; color: white; }
+        .badge-recebido { background: #2ecc71; color: white; }
+        .badge-retirado { background: #3498db; color: white; }
+        .badge-dentro { background: #f39c12; color: white; }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 2000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-content {
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+            width: 90%;
+            max-width: 500px;
+            max-height: 85%;
+            overflow-y: auto;
+        }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .modal-header h3 { font-size: 18px; }
+        .close { font-size: 28px; cursor: pointer; color: #999; line-height: 1; }
+        .close:hover { color: #e74c3c; }
+
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: 600; font-size: 12px; color: #333; }
+        input, select, textarea {
+            width: 100%;
+            padding: 8px 10px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 13px;
+        }
+        textarea { resize: vertical; min-height: 70px; }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .stat-card {
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .stat-number { font-size: 24px; font-weight: bold; color: #3498db; }
+        .stat-label { font-size: 11px; color: #666; margin-top: 5px; }
+
+        .alert { padding: 12px; border-radius: 8px; margin-bottom: 15px; font-size: 13px; }
+        .alert-success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+
+        @media (max-width: 768px) {
+            .sidebar { width: 100%; position: relative; top: 0; margin-bottom: 20px; }
+            .main-content { margin-left: 0; }
+            .container { flex-direction: column; }
+            .tabs { justify-content: center; }
+            .tab-btn { min-width: 80px; padding: 6px 10px; font-size: 10px; }
+            .stats-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+    </style>
+</head>
+<body>
+
+{% if backup_msg %}
+<div id="backup-alert" style="position: fixed; top: 70px; right: 20px; z-index: 9999; background: #d4edda; color: #155724; border: 1px solid #c3e6cb; padding: 12px; border-radius: 8px; max-width: 380px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); font-size: 13px;">
+    <strong>📦 Backup</strong><br>
+    {{ backup_msg|replace('\n', '<br>')|safe }}
+    <button onclick="this.parentElement.remove()" style="float:right; background:none; border:none; font-size:18px; cursor:pointer;">&times;</button>
+</div>
+<script>
+    setTimeout(function() {
+        var alertDiv = document.getElementById('backup-alert');
+        if(alertDiv) {
+            alertDiv.style.opacity = '0';
+            alertDiv.style.transition = 'opacity 1s';
+            setTimeout(function() { if(alertDiv) alertDiv.remove(); }, 1000);
+        }
+    }, 5000);
+</script>
+{% endif %}
+
+    <nav class="navbar">
+        <div class="nav-brand">🏢 Gestor de Condomínios - MASTER</div>
+        <div class="nav-user">
+            <span>👤 {{ session.usuario_nome }}</span>
+            <a href="/logout" class="btn-logout">Sair</a>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="sidebar">
+            <h3>📊 Menu Principal</h3>
+            <div class="sidebar-buttons">
+                <button class="btn-sidebar" onclick="abrirModalCondominio()">➕ Novo Condomínio</button>
+                <button class="btn-sidebar" onclick="abrirModalPorteiro()">👤 Novo Porteiro</button>
+                <a href="/gerenciar-backups" class="btn-sidebar" style="background: #1abc9c; text-decoration: none; display: block; text-align: center; color: white;">💾 GERENCIAR BACKUPS</a>
+            </div>
+            <h3 style="margin-top: 20px;">🏘️ Condomínios</h3>
+            <div id="lista-condominios"></div>
+        </div>
+
+        <div class="main-content">
+            <div class="content-header">
+                <h2 id="titulo-condominio">Selecione um condomínio</h2>
+                <div>
+                    <button class="btn btn-danger" onclick="zerarDados()" id="btn-zerar" style="display:none;">🗑️ Zerar Dados</button>
+                    <button class="btn btn-success" onclick="exportarExcel()" id="btn-exportar" style="display:none;">📊 Exportar Excel</button>
+                    <button class="btn btn-primary" onclick="abrirModalPessoa()" id="btn-nova-pessoa" style="display:none;">➕ Nova Pessoa</button>
+                    <button class="btn btn-primary" onclick="abrirModalRegistro()" id="btn-novo-registro" style="display:none;">➕ Novo Registro</button>
+                    <button class="btn btn-warning" onclick="abrirModalEditarCondominio()" id="btn-editar-cond" style="display:none;">✏️ Editar Condomínio</button>
+                    <button class="btn btn-info" onclick="verConsolidado()" id="btn-consolidado" style="display:none; background:#9b59b6;">📊 VISÃO CONSOLIDADA</button>
+                </div>
+            </div>
+
+            <div class="stats-grid" id="stats-grid" style="display:none;">
+                <div class="stat-card"><div class="stat-number" id="total-visitantes">0</div><div class="stat-label">Visitantes</div></div>
+                <div class="stat-card"><div class="stat-number" id="total-moradores">0</div><div class="stat-label">Moradores</div></div>
+                <div class="stat-card"><div class="stat-number" id="total-encomendas">0</div><div class="stat-label">Encomendas</div></div>
+                <div class="stat-card"><div class="stat-number" id="total-avisos">0</div><div class="stat-label">Avisos</div></div>
+                <div class="stat-card"><div class="stat-number" id="total-porteiros">0</div><div class="stat-label">Porteiros</div></div>
+            </div>
+
+            <div class="tabs">
+                <button class="tab-btn active" onclick="mudarTab('visitantes')">👥 VISITANTES</button>
+                <button class="tab-btn" onclick="mudarTab('moradores')">🏠 MORADORES</button>
+                <button class="tab-btn" onclick="mudarTab('encomendas')">📦 ENCOMENDAS</button>
+                <button class="tab-btn" onclick="mudarTab('avisos')">📢 AVISOS</button>
+                <button class="tab-btn" onclick="mudarTab('porteiros')">👮 PORTEIROS</button>
+            </div>
+
+            <!-- ABA 1: VISITANTES -->
+            <div id="tab-visitantes" class="tab-content active">
+                <div class="table-container">
+                    <table id="tabela-visitantes">
+                        <thead>
+                            <tr>
+                                <th>Data Cadastro</th>
+                                <th>Nome</th>
+                                <th>Documento</th>
+                                <th>Placa</th>
+                                <th>Casa</th>
+                                <th>Observação</th>
+                                <th>Ações</th>
+
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- ABA 2: MORADORES -->
+            <div id="tab-moradores" class="tab-content">
+                <div class="table-container">
+                    <table id="tabela-moradores">
+                        <thead>
+                            <tr>
+                                <th>Casa</th>
+                                <th>Nome</th>
+                                <th>Documento</th>
+                                <th>Telefone</th>
+                                <th>Observação</th>
+                                <th>Ações</th>
+
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- ABA 3: ENCOMENDAS -->
+            <div id="tab-encomendas" class="tab-content">
+                <div class="table-container">
+                    <table id="tabela-encomendas">
+                        <thead>
+                            <tr>
+                                <th>Data/Hora</th>
+                                <th>Entregador</th>
+                                <th>Destinatário</th>
+                                <th>Status</th>
+                                <th>Ações</th>
+
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- ABA 4: AVISOS -->
+            <div id="tab-avisos" class="tab-content">
+                <div class="table-container">
+                    <table id="tabela-avisos">
+                        <thead>
+                            <tr>
+                                <th>Data/Hora</th>
+                                <th>Título</th>
+                                <th>Descrição</th>
+                                <th>Ações</th>
+
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- ABA 5: PORTEIROS -->
+            <div id="tab-porteiros" class="tab-content">
+                <div class="table-container">
+                    <table id="tabela-porteiros">
+                        <thead>
+                            <tr>
+                                <th>Nome</th>
+                                <th>Email</th>
+                                <th>Status</th>
+                                <th>Ações</th>
+
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modais (mantidos iguais) -->
+    <div id="modal-condominio" class="modal">
+        <div class="modal-content">
+            <div class="modal-header"><h3 id="modal-condominio-titulo">Novo Condomínio</h3><span class="close" onclick="fecharModal('modal-condominio')">&times;</span></div>
+            <form id="form-condominio">
+                <input type="hidden" id="condominio-id">
+                <div class="form-group"><label>Nome *</label><input type="text" id="condominio-nome" required></div>
+                <div class="form-group"><label>Endereço</label><input type="text" id="condominio-endereco"></div>
+                <div class="form-group"><label>Cor</label><input type="color" id="condominio-cor" value="#3498db"></div>
+                <button type="submit" class="btn btn-primary" style="width:100%">Salvar</button>
+                <button type="button" class="btn btn-danger" onclick="excluirCondominio()" id="btn-excluir-cond" style="display:none; margin-top:10px; width:100%">Excluir</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="modal-porteiro" class="modal">
+        <div class="modal-content">
+            <div class="modal-header"><h3 id="modal-porteiro-titulo">Novo Porteiro</h3><span class="close" onclick="fecharModal('modal-porteiro')">&times;</span></div>
+            <form id="form-porteiro">
+                <input type="hidden" id="porteiro-id">
+                <div class="form-group"><label>Nome *</label><input type="text" id="porteiro-nome" required></div>
+                <div class="form-group"><label>Email *</label><input type="email" id="porteiro-email" required></div>
+                <div class="form-group"><label>Senha</label><input type="password" id="porteiro-senha" placeholder="Deixe em branco para manter"></div>
+                <div class="form-group"><label>Condomínio *</label><select id="porteiro-condominio-id" required></select></div>
+                <div class="form-group"><label>Status</label><select id="porteiro-ativo"><option value="1">Ativo</option><option value="0">Inativo</option></select></div>
+                <button type="submit" class="btn btn-primary" style="width:100%">Salvar</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="modal-pessoa" class="modal">
+        <div class="modal-content">
+            <div class="modal-header"><h3 id="modal-pessoa-titulo">Nova Pessoa</h3><span class="close" onclick="fecharModal('modal-pessoa')">&times;</span></div>
+            <form id="form-pessoa">
+                <input type="hidden" id="pessoa-id">
+                <div class="form-group"><label>Tipo *</label><select id="pessoa-tipo" required><option value="MORADOR">Morador</option><option value="VISITANTE">Visitante</option></select></div>
+                <div class="form-group"><label>Nome *</label><input type="text" id="pessoa-nome" required></div>
+                <div class="form-group"><label>Documento</label><input type="text" id="pessoa-documento"></div>
+                <div class="form-group"><label>Placa</label><input type="text" id="pessoa-placa"></div>
+                <div class="form-group"><label>Telefone</label><input type="text" id="pessoa-telefone"></div>
+                <div class="form-group"><label>Casa</label><input type="text" id="pessoa-casa"></div>
+                <div class="form-group"><label>Observação</label><textarea id="pessoa-observacao" rows="2"></textarea></div>
+                <button type="submit" class="btn btn-primary" style="width:100%">Salvar</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="modal-registro" class="modal">
+        <div class="modal-content">
+            <div class="modal-header"><h3 id="modal-registro-titulo">Novo Registro</h3><span class="close" onclick="fecharModal('modal-registro')">&times;</span></div>
+            <form id="form-registro">
+                <input type="hidden" id="registro-id">
+                <div class="form-group"><label>Tipo *</label><select id="registro-tipo" required><option value="AVISO">Aviso</option><option value="ENCOMENDA">Encomenda</option><option value="ENTRADA">Entrada</option></select></div>
+                <div class="form-group"><label>Título *</label><input type="text" id="registro-titulo" required></div>
+                <div class="form-group"><label>Descrição</label><textarea id="registro-descricao" rows="2"></textarea></div>
+                <div class="form-group"><label>Pessoa</label><select id="registro-pessoa-id"><option value="">Nenhum</option></select></div>
+                <div class="form-group"><label>Status</label><select id="registro-status"><option value="AGUARDANDO">Aguardando</option><option value="RECEBIDO">Recebido</option><option value="RETIRADO">Retirado</option></select></div>
+                <button type="submit" class="btn btn-primary" style="width:100%">Salvar</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="modal-senha" class="modal">
+        <div class="modal-content" style="max-width:400px;">
+            <div class="modal-header"><h3>🔐 Confirmação</h3><span class="close" onclick="fecharModal('modal-senha')">&times;</span></div>
+            <div id="modal-senha-mensagem" style="margin-bottom:15px; color:#e74c3c; font-size:13px;"></div>
+            <div class="form-group"><label>Senha do Administrador</label><input type="password" id="senha-confirmacao" placeholder="Digite sua senha master"></div>
+            <div style="display:flex; gap:10px;"><button onclick="confirmarAcao()" class="btn btn-danger" style="flex:1">Confirmar</button><button onclick="fecharModal('modal-senha')" class="btn btn-secondary" style="flex:1; background:#95a5a6; color:white;">Cancelar</button></div>
+        </div>
+    </div>
+
+    <script>
+        let condominioAtual = null;
+        let condominios = [];
+        let acaoPendente = null;
+
+        function fecharModal(modalId) {
+            var modal = document.getElementById(modalId);
+            if (modal) modal.style.display = 'none';
+        }
+
+        function abrirModalSenha(mensagem, acao) {
+            document.getElementById('modal-senha-mensagem').innerHTML = mensagem;
+            document.getElementById('senha-confirmacao').value = '';
+            acaoPendente = acao;
+            document.getElementById('modal-senha').style.display = 'flex';
+        }
+
+        function confirmarAcao() {
+            var senha = document.getElementById('senha-confirmacao').value;
+            if (!senha) { alert('Digite a senha!'); return; }
+            if (acaoPendente) acaoPendente(senha);
+            fecharModal('modal-senha');
+        }
+
+        function mostrarMensagem(texto, tipo) { alert(texto); }
+
+        // CARREGAR CONDOMÍNIOS
+        function carregarCondominios() {
+            fetch('/api/condominios')
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    condominios = data;
+                    var lista = document.getElementById('lista-condominios');
+                    lista.innerHTML = '';
+                    for (var i = 0; i < data.length; i++) {
+                        var cond = data[i];
+                        var btn = document.createElement('button');
+                        btn.className = 'cond-item';
+                        btn.style.background = cond.cor;
+                        btn.style.color = '#fff';
+                        btn.innerHTML = cond.nome + '<br><small>' + (cond.endereco || 'Sem endereço') + '</small>';
+                        btn.onclick = (function(id, nome) {
+                            return function() { selecionarCondominio(id, nome); };
+                        })(cond.id, cond.nome);
+                        lista.appendChild(btn);
+                    }
+                });
+        }
+
+        function selecionarCondominio(id, nome) {
+            condominioAtual = id;
+            document.getElementById('titulo-condominio').innerHTML = nome;
+            document.getElementById('btn-zerar').style.display = 'inline-block';
+            document.getElementById('btn-exportar').style.display = 'inline-block';
+            document.getElementById('btn-nova-pessoa').style.display = 'inline-block';
+            document.getElementById('btn-novo-registro').style.display = 'inline-block';
+            document.getElementById('btn-editar-cond').style.display = 'inline-block';
+            document.getElementById('btn-consolidado').style.display = 'inline-block';
+            document.getElementById('stats-grid').style.display = 'grid';
+            carregarDados();
+            carregarPorteiros();
+        }
+
+        function carregarDados() {
+            if (!condominioAtual) return;
+            fetch('/api/condominio/' + condominioAtual + '/dados')
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    var visitantes = [];
+                    var moradores = [];
+                    for (var i = 0; i < data.pessoas.length; i++) {
+                        if (data.pessoas[i].tipo === 'VISITANTE') visitantes.push(data.pessoas[i]);
+                        else if (data.pessoas[i].tipo === 'MORADOR') moradores.push(data.pessoas[i]);
+                    }
+
+                    var encomendas = [];
+                    var avisos = [];
+                    for (var i = 0; i < data.registros.length; i++) {
+                        if (data.registros[i].tipo === 'ENCOMENDA') encomendas.push(data.registros[i]);
+                        else if (data.registros[i].tipo === 'AVISO') avisos.push(data.registros[i]);
+                    }
+
+                    carregarTabelaVisitantes(visitantes);
+                    carregarTabelaMoradores(moradores);
+                    carregarTabelaEncomendas(encomendas);
+                    carregarTabelaAvisos(avisos);
+                    carregarSelectPessoas(data.pessoas);
+
+                    document.getElementById('total-visitantes').innerText = visitantes.length;
+                    document.getElementById('total-moradores').innerText = moradores.length;
+                    document.getElementById('total-encomendas').innerText = encomendas.length;
+                    document.getElementById('total-avisos').innerText = avisos.length;
+                });
+        }
+
+        function carregarPorteiros() {
+            if (!condominioAtual) return;
+            fetch('/api/porteiros?condominio_id=' + condominioAtual)
+                .then(function(r) { return r.json(); })
+                .then(function(porteiros) {
+                    carregarTabelaPorteiros(porteiros);
+                    document.getElementById('total-porteiros').innerText = porteiros.length;
+                });
+        }
+
+        // TABELA VISITANTES
+      function carregarTabelaVisitantes(visitantes) {
+    var tbody = document.querySelector('#tabela-visitantes tbody');
+    tbody.innerHTML = '';
+
+    if (!visitantes || visitantes.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;">Nenhum visitante cadastrado</td></tr>';
+        return;
+    }
+
+    for (var i = 0; i < visitantes.length; i++) {
+        var v = visitantes[i];
+        var row = tbody.insertRow();
+
+        // Data - usa created_at ou data atual
+        var dataTexto = '-';
+        if (v.created_at) {
+            dataTexto = new Date(v.created_at).toLocaleString('pt-BR');
+        } else {
+            dataTexto = new Date().toLocaleString('pt-BR');
+        }
+        row.insertCell(0).innerText = dataTexto;
+
+        row.insertCell(1).innerText = v.nome || '-';
+        row.insertCell(2).innerText = v.documento || '-';
+        row.insertCell(3).innerText = v.placa || '-';
+        row.insertCell(4).innerText = v.casa || '-';
+        row.insertCell(5).innerText = v.observacao || '-';
+        row.insertCell(6).innerHTML = '<button onclick="editarPessoa(' + v.id + ')" class="btn btn-info" style="padding:3px 8px; margin:2px;">✏️</button> <button onclick="excluirPessoa(' + v.id + ')" class="btn btn-danger" style="padding:3px 8px; margin:2px;">🗑️</button>';
+    }
+}
+
+
+        // TABELA MORADORES
+        function carregarTabelaMoradores(moradores) {
+            var tbody = document.querySelector('#tabela-moradores tbody');
+            tbody.innerHTML = '';
+
+            if (!moradores || moradores.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">Nenhum morador cadastrado</td></tr>';
+                return;
+            }
+
+            for (var i = 0; i < moradores.length; i++) {
+                var m = moradores[i];
+                var row = tbody.insertRow();
+                row.insertCell(0).innerText = m.casa || '-';
+                row.insertCell(1).innerText = m.nome;
+                row.insertCell(2).innerText = m.documento || '-';
+                row.insertCell(3).innerText = m.telefone || '-';
+                row.insertCell(4).innerText = m.observacao || '-';
+                row.insertCell(5).innerHTML = '<button onclick="editarPessoa(' + m.id + ')" class="btn btn-info" style="padding:3px 8px; margin:2px;">✏️</button> <button onclick="excluirPessoa(' + m.id + ')" class="btn btn-danger" style="padding:3px 8px; margin:2px;">🗑️</button>';
+            }
+        }
+
+        // TABELA ENCOMENDAS
+        function carregarTabelaEncomendas(encomendas) {
+            var tbody = document.querySelector('#tabela-encomendas tbody');
+            tbody.innerHTML = '';
+
+            if (!encomendas || encomendas.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;">Nenhuma encomenda registrada</td></tr>';
+                return;
+            }
+
+            for (var i = 0; i < encomendas.length; i++) {
+                var e = encomendas[i];
+                var row = tbody.insertRow();
+                row.insertCell(0).innerText = new Date(e.data_hora).toLocaleString();
+                row.insertCell(1).innerText = e.entregador || e.titulo || '-';
+                row.insertCell(2).innerText = e.destinatario || e.pessoa_nome || '-';
+
+                var statusClass = 'badge-aguardando';
+                var statusText = e.status || 'AGUARDANDO';
+                if (e.status === 'RECEBIDO') statusClass = 'badge-recebido';
+                else if (e.status === 'RETIRADO') statusClass = 'badge-retirado';
+
+                row.insertCell(3).innerHTML = '<span class="badge ' + statusClass + '">' + statusText + '</span>';
+                row.insertCell(4).innerHTML = '<button onclick="editarRegistro(' + e.id + ')" class="btn btn-info" style="padding:3px 8px; margin:2px;">✏️</button> <button onclick="excluirRegistro(' + e.id + ')" class="btn btn-danger" style="padding:3px 8px; margin:2px;">🗑️</button>';
+            }
+        }
+
+        // TABELA AVISOS
+        function carregarTabelaAvisos(avisos) {
+            var tbody = document.querySelector('#tabela-avisos tbody');
+            tbody.innerHTML = '';
+
+            if (!avisos || avisos.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">Nenhum aviso registrado</td></tr>';
+                return;
+            }
+
+            for (var i = 0; i < avisos.length; i++) {
+                var a = avisos[i];
+                var row = tbody.insertRow();
+                row.insertCell(0).innerText = new Date(a.data_hora).toLocaleString();
+                row.insertCell(1).innerText = a.titulo;
+                row.insertCell(2).innerText = a.descricao || '-';
+                row.insertCell(3).innerHTML = '<button onclick="editarRegistro(' + a.id + ')" class="btn btn-info" style="padding:3px 8px; margin:2px;">✏️</button> <button onclick="excluirRegistro(' + a.id + ')" class="btn btn-danger" style="padding:3px 8px; margin:2px;">🗑️</button>';
+            }
+        }
+
+        // TABELA PORTEIROS
+        function carregarTabelaPorteiros(porteiros) {
+            var tbody = document.querySelector('#tabela-porteiros tbody');
+            tbody.innerHTML = '';
+
+            if (!porteiros || porteiros.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">Nenhum porteiro cadastrado</td></tr>';
+                return;
+            }
+
+            for (var i = 0; i < porteiros.length; i++) {
+                var p = porteiros[i];
+                var row = tbody.insertRow();
+                row.insertCell(0).innerText = p.nome;
+                row.insertCell(1).innerText = p.email;
+                row.insertCell(2).innerHTML = p.ativo ? '<span class="badge badge-ativo">Ativo</span>' : '<span class="badge badge-inativo">Inativo</span>';
+                row.insertCell(3).innerHTML = '<button onclick="editarPorteiro(' + p.id + ')" class="btn btn-info" style="padding:3px 8px; margin:2px;">✏️</button> <button onclick="excluirPorteiro(' + p.id + ')" class="btn btn-danger" style="padding:3px 8px; margin:2px;">🔒</button>';
+            }
+        }
+
+        function carregarSelectPessoas(pessoas) {
+            var select = document.getElementById('registro-pessoa-id');
+            select.innerHTML = '<option value="">Nenhum</option>';
+            for (var i = 0; i < pessoas.length; i++) {
+                select.innerHTML += '<option value="' + pessoas[i].id + '">' + pessoas[i].nome + '</option>';
+            }
+        }
+
+        function carregarSelectCondominios() {
+            fetch('/api/condominios')
+                .then(function(r) { return r.json(); })
+                .then(function(condominios) {
+                    var select = document.getElementById('porteiro-condominio-id');
+                    select.innerHTML = '';
+                    for (var i = 0; i < condominios.length; i++) {
+                        select.innerHTML += '<option value="' + condominios[i].id + '">' + condominios[i].nome + '</option>';
+                    }
+                });
+        }
+
+        // CRUD Condomínio
+        function abrirModalCondominio() {
+            document.getElementById('modal-condominio').style.display = 'flex';
+            document.getElementById('form-condominio').reset();
+            document.getElementById('condominio-id').value = '';
+            document.getElementById('modal-condominio-titulo').innerText = 'Novo Condomínio';
+            document.getElementById('btn-excluir-cond').style.display = 'none';
+        }
+
+        function abrirModalEditarCondominio() {
+            var cond = null;
+            for (var i = 0; i < condominios.length; i++) {
+                if (condominios[i].id === condominioAtual) cond = condominios[i];
+            }
+            if (cond) {
+                document.getElementById('condominio-id').value = cond.id;
+                document.getElementById('condominio-nome').value = cond.nome;
+                document.getElementById('condominio-endereco').value = cond.endereco || '';
+                document.getElementById('condominio-cor').value = cond.cor;
+                document.getElementById('modal-condominio-titulo').innerText = 'Editar Condomínio';
+                document.getElementById('btn-excluir-cond').style.display = 'block';
+                document.getElementById('modal-condominio').style.display = 'flex';
+            }
+        }
+
+        function excluirCondominio() {
+            if (confirm('Excluir este condomínio? TODOS os dados serão removidos!')) {
+                fetch('/api/condominios?id=' + condominioAtual, { method: 'DELETE' })
+                    .then(function(r) { return r.json(); })
+                    .then(function(result) {
+                        if (result.error) alert(result.error);
+                        else { alert('Condomínio excluído!'); fecharModal('modal-condominio'); carregarCondominios(); }
+                    });
+            }
+        }
+
+        // CRUD Porteiro
+        function abrirModalPorteiro() {
+            carregarSelectCondominios();
+            document.getElementById('modal-porteiro').style.display = 'flex';
+            document.getElementById('form-porteiro').reset();
+            document.getElementById('porteiro-id').value = '';
+            document.getElementById('modal-porteiro-titulo').innerText = 'Novo Porteiro';
+        }
+
+        function editarPorteiro(id) {
+            fetch('/api/porteiros').then(function(r) { return r.json(); }).then(function(porteiros) {
+                var p = null;
+                for (var i = 0; i < porteiros.length; i++) {
+                    if (porteiros[i].id === id) p = porteiros[i];
+                }
+                if (p) {
+                    carregarSelectCondominios();
+                    document.getElementById('porteiro-id').value = p.id;
+                    document.getElementById('porteiro-nome').value = p.nome;
+                    document.getElementById('porteiro-email').value = p.email;
+                    document.getElementById('porteiro-ativo').value = p.ativo;
+                    document.getElementById('modal-porteiro-titulo').innerText = 'Editar Porteiro';
+                    document.getElementById('modal-porteiro').style.display = 'flex';
+                }
+            });
+        }
+
+        function excluirPorteiro(id) {
+            if (confirm('Desativar este porteiro?')) {
+                fetch('/api/porteiros?id=' + id, { method: 'DELETE' })
+                    .then(function() { carregarPorteiros(); });
+            }
+        }
+
+        // CRUD Pessoa
+        function abrirModalPessoa() {
+            if (!condominioAtual) { alert('Selecione um condomínio!'); return; }
+            document.getElementById('modal-pessoa').style.display = 'flex';
+            document.getElementById('form-pessoa').reset();
+            document.getElementById('pessoa-id').value = '';
+            document.getElementById('modal-pessoa-titulo').innerText = 'Nova Pessoa';
+        }
+
+        function editarPessoa(id) {
+            fetch('/api/pessoas?condominio_id=' + condominioAtual).then(function(r) { return r.json(); }).then(function(pessoas) {
+                var p = null;
+                for (var i = 0; i < pessoas.length; i++) {
+                    if (pessoas[i].id === id) p = pessoas[i];
+                }
+                if (p) {
+                    document.getElementById('pessoa-id').value = p.id;
+                    document.getElementById('pessoa-tipo').value = p.tipo;
+                    document.getElementById('pessoa-nome').value = p.nome;
+                    document.getElementById('pessoa-documento').value = p.documento || '';
+                    document.getElementById('pessoa-placa').value = p.placa || '';
+                    document.getElementById('pessoa-telefone').value = p.telefone || '';
+                    document.getElementById('pessoa-casa').value = p.casa || '';
+                    document.getElementById('pessoa-observacao').value = p.observacao || '';
+                    document.getElementById('modal-pessoa-titulo').innerText = 'Editar Pessoa';
+                    document.getElementById('modal-pessoa').style.display = 'flex';
+                }
+            });
+        }
+
+        function excluirPessoa(id) {
+            if (confirm('Excluir esta pessoa?')) {
+                fetch('/api/pessoas?id=' + id + '&condominio_id=' + condominioAtual, { method: 'DELETE' })
+                    .then(function() { carregarDados(); });
+            }
+        }
+
+        // CRUD Registro
+        function abrirModalRegistro() {
+            if (!condominioAtual) { alert('Selecione um condomínio!'); return; }
+            document.getElementById('modal-registro').style.display = 'flex';
+            document.getElementById('form-registro').reset();
+            document.getElementById('registro-id').value = '';
+            document.getElementById('modal-registro-titulo').innerText = 'Novo Registro';
+        }
+
+        function editarRegistro(id) {
+            fetch('/api/registros?condominio_id=' + condominioAtual).then(function(r) { return r.json(); }).then(function(registros) {
+                var reg = null;
+                for (var i = 0; i < registros.length; i++) {
+                    if (registros[i].id === id) reg = registros[i];
+                }
+                if (reg) {
+                    document.getElementById('registro-id').value = reg.id;
+                    document.getElementById('registro-tipo').value = reg.tipo;
+                    document.getElementById('registro-titulo').value = reg.titulo;
+                    document.getElementById('registro-descricao').value = reg.descricao || '';
+                    document.getElementById('registro-pessoa-id').value = reg.pessoa_id || '';
+                    document.getElementById('registro-status').value = reg.status;
+                    document.getElementById('modal-registro-titulo').innerText = 'Editar Registro';
+                    document.getElementById('modal-registro').style.display = 'flex';
+                }
+            });
+        }
+
+        function excluirRegistro(id) {
+            if (confirm('Excluir este registro?')) {
+                fetch('/api/registros?id=' + id + '&condominio_id=' + condominioAtual, { method: 'DELETE' })
+                    .then(function() { carregarDados(); });
+            }
+        }
+
+        // Ações
+        function exportarExcel() { window.open('/exportar/excel/' + condominioAtual, '_blank'); }
+        function verConsolidado() { window.open('/consolidado/' + condominioAtual, '_blank'); }
+
+        function zerarDados() {
+            if (confirm('Zerar dados deste condomínio? Todas as pessoas e registros serão removidos!')) {
+                fetch('/api/zerar-dados/' + condominioAtual, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ senha: '123456' }) })
+                    .then(function(r) { return r.json(); }).then(function(result) { alert(result.message); if (result.success) carregarDados(); });
+            }
+        }
+
+        function mudarTab(tab) {
+            var tabs = document.querySelectorAll('.tab-content');
+            for (var i = 0; i < tabs.length; i++) tabs[i].classList.remove('active');
+            var btns = document.querySelectorAll('.tab-btn');
+            for (var i = 0; i < btns.length; i++) btns[i].classList.remove('active');
+            document.getElementById('tab-' + tab).classList.add('active');
+            event.target.classList.add('active');
+        }
+
+        // Formulários
+        document.getElementById('form-condominio').onsubmit = function(e) {
+            e.preventDefault();
+            var data = { nome: document.getElementById('condominio-nome').value, endereco: document.getElementById('condominio-endereco').value, cor: document.getElementById('condominio-cor').value };
+            var id = document.getElementById('condominio-id').value;
+            var method = id ? 'PUT' : 'POST';
+            if (id) data.id = parseInt(id);
+            fetch('/api/condominios', { method: method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) })
+                .then(function() { fecharModal('modal-condominio'); carregarCondominios(); });
+        };
+
+        document.getElementById('form-porteiro').onsubmit = function(e) {
+            e.preventDefault();
+            var data = { nome: document.getElementById('porteiro-nome').value, email: document.getElementById('porteiro-email').value, condominio_id: parseInt(document.getElementById('porteiro-condominio-id').value), ativo: parseInt(document.getElementById('porteiro-ativo').value) };
+            var senha = document.getElementById('porteiro-senha').value;
+            if (senha) data.senha = senha;
+            var id = document.getElementById('porteiro-id').value;
+            var method = id ? 'PUT' : 'POST';
+            if (id) data.id = parseInt(id);
+            fetch('/api/porteiros', { method: method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) })
+                .then(function() { fecharModal('modal-porteiro'); if (condominioAtual) carregarPorteiros(); });
+        };
+
+        document.getElementById('form-pessoa').onsubmit = function(e) {
+            e.preventDefault();
+            var data = { tipo: document.getElementById('pessoa-tipo').value, nome: document.getElementById('pessoa-nome').value, documento: document.getElementById('pessoa-documento').value, placa: document.getElementById('pessoa-placa').value, telefone: document.getElementById('pessoa-telefone').value, casa: document.getElementById('pessoa-casa').value, observacao: document.getElementById('pessoa-observacao').value };
+            var id = document.getElementById('pessoa-id').value;
+            var method = id ? 'PUT' : 'POST';
+            if (id) data.id = parseInt(id);
+            fetch('/api/pessoas?condominio_id=' + condominioAtual, { method: method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) })
+                .then(function() { fecharModal('modal-pessoa'); carregarDados(); });
+        };
+
+        document.getElementById('form-registro').onsubmit = function(e) {
+            e.preventDefault();
+            var data = { tipo: document.getElementById('registro-tipo').value, titulo: document.getElementById('registro-titulo').value, descricao: document.getElementById('registro-descricao').value, pessoa_id: document.getElementById('registro-pessoa-id').value || null, status: document.getElementById('registro-status').value };
+            var id = document.getElementById('registro-id').value;
+            var method = id ? 'PUT' : 'POST';
+            if (id) data.id = parseInt(id);
+            fetch('/api/registros?condominio_id=' + condominioAtual, { method: method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) })
+                .then(function() { fecharModal('modal-registro'); carregarDados(); });
+        };
+
+        document.getElementById('condominio-cor').onchange = function(e) {
+            var preview = document.getElementById('cor-preview');
+            if (preview) preview.style.background = e.target.value;
+        };
+
+        carregarCondominios();
+    </script>
+</body>
+</html>

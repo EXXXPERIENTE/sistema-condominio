@@ -1,0 +1,23 @@
+condominio-app/
+├── App.js
+├── app.json
+├── package.json
+├── babel.config.js
+├── src/
+│   ├── database/
+│   │   ├── database.js          # Inicialização do SQLite
+│   │   └── seed.js              # Dados iniciais
+│   ├── screens/
+│   │   ├── LoginScreen.js
+│   │   ├── MasterScreen.js      # Master vê todos condomínios
+│   │   ├── PorteiroScreen.js    # Porteiro vê só seu condomínio
+│   │   ├── RegistrosListScreen.js  # Lista estilo planilha
+│   │   └── RegistroFormScreen.js   # Cadastro/edição
+│   ├── components/
+│   │   ├── SideMenu.js          # Menu lateral
+│   │   ├── CustomTable.js       # Tabela estilo planilha
+│   │   └── CustomButton.js
+│   ├── contexts/
+│   │   └── AuthContext.js       # Contexto de autenticação/perfil
+│   └── utils/
+│       └── helpers.js
