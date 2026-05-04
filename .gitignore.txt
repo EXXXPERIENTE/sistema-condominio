@@ -1,18 +1,30 @@
+<<<<<<< HEAD
 @"
+=======
+>>>>>>> 4a0293a7c741758c50d4bcde113d3adca2a72042
 # Python
 __pycache__/
 *.py[cod]
 *.so
 .Python
+<<<<<<< HEAD
 env/
 venv/
 .venv/
+=======
+.env
+venv/
+.venv/
+env/
+ENV/
+>>>>>>> 4a0293a7c741758c50d4bcde113d3adca2a72042
 
 # Banco de dados
 *.db
 *.sqlite
 *.sqlite3
 
+<<<<<<< HEAD
 # Backups
 backups/
 *.zip
@@ -22,12 +34,43 @@ backups/
 .env
 .env.local
 
+=======
+>>>>>>> 4a0293a7c741758c50d4bcde113d3adca2a72042
 # IDE
 .vscode/
 .idea/
 *.swp
+<<<<<<< HEAD
 
 # OS
 .DS_Store
 Thumbs.db
 "@ | Out-File -FilePath .gitignore -Encoding UTF8
+=======
+*.swo
+
+# Logs
+*.log
+logs/
+
+# Arquivos locais
+*.pyc
+config_local.py
+*.pem
+
+# Backup
+*.bak
+*.backup
+
+# Sensitive data
+*.key
+*.pem
+credentials.json
+
+# MySQL
+*.sql
+
+# Sistema
+.DS_Store
+Thumbs.db
+>>>>>>> 4a0293a7c741758c50d4bcde113d3adca2a72042

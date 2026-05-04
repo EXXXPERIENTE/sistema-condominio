@@ -1,7 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="Black">
+<<<<<<< HEAD
     <option name="sdkName" value="Python 3.11 (Gestor_Sindico)" />
   </component>
   <component name="ProjectRootManager" version="2" project-jdk-name="Python 3.11 virtualenv at D:\APPPY\Gestor_Sindico\.venv" project-jdk-type="Python SDK" />
+=======
+    <option name="sdkName" value="Python 3.8 (Segurança)" />
+  </component>
+  <component name="ProjectRootManager" version="2" project-jdk-name="Python 3.8 (Segurança)" project-jdk-type="Python SDK" />
+>>>>>>> 4a0293a7c741758c50d4bcde113d3adca2a72042
 </project>

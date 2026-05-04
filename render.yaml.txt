@@ -1,5 +1,6 @@
 services:
   - type: web
+<<<<<<< HEAD
     name: gestor-condominios
     runtime: python
     buildCommand: pip install -r requirements.txt
@@ -19,3 +20,18 @@ databases:
     databaseName: condominio_db
     user: condominio_user
     plan: free
+=======
+    name: smartcond
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn web_main:app
+    envVars:
+      - key: MYSQL_HOST
+        value: localhost
+      - key: MYSQL_USER
+        value: root
+      - key: MYSQL_PASSWORD
+        value: ""
+      - key: MYSQL_DATABASE
+        value: condominio_db
+>>>>>>> 4a0293a7c741758c50d4bcde113d3adca2a72042
