@@ -1,15 +1,32 @@
+import os
+import sys
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify, send_file
-from database.init_db import init_db, get_db, get_db_connection, hash_senha, verificar_senha
 from functools import wraps
 import pandas as pd
 import io
 import json
 from datetime import datetime
-import os
 import shutil
 
+# Carregar variáveis de ambiente
+try:
+    from dotenv import load_dotenv
+
+    load_dotenv()
+except:
+    pass
+
+# Configurar caminhos e importações
+try:
+    from database.init_db import init_db, get_db, hash_senha, verificar_senha
+except Exception as e:
+    print(f"⚠️ Erro ao importar database: {e}")
+    # Fallback para produção
+    sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+    from database.init_db import init_db, get_db, hash_senha, verificar_senha
+
 app = Flask(__name__)
-app.secret_key = 'sua_chave_secreta_aqui_mude_para_producao'
+app.secret_key = os.environ.get('SECRET_KEY', 'sua_chave_secreta_aqui_mude_para_producao')
 
 
 def login_required(f):
@@ -345,135 +362,28 @@ def backup_banco():
         nome_backup = f'backup_condominio_{timestamp}.db'
         caminho_backup = os.path.join(backup_dir, nome_backup)
 
-        shutil.copy2(DB_PATH, caminho_backup)
+        # Para PostgreSQL, fazemos backup via pg_dump
+        import subprocess
+        database_url = os.environ.get('DATABASE_URL')
+        if database_url:
+            subprocess.run(f'pg_dump {database_url} > {caminho_backup}', shell=True)
+        else:
+            # Fallback para SQLite
+            from database.init_db import DB_PATH
+            shutil.copy2(DB_PATH, caminho_backup)
 
         tamanho = os.path.getsize(caminho_backup) / 1024
-        session['backup_msg'] = f'✅ Backup criado com sucesso! Local: {caminho_backup} Tamanho: {tamanho:.2f} KB'
+        session['backup_msg'] = f'✅ Backup criado com sucesso! Tamanho: {tamanho:.2f} KB'
 
         return send_file(
-            DB_PATH,
-            mimetype='application/x-sqlite3',
+            caminho_backup,
+            mimetype='application/octet-stream',
             as_attachment=True,
             download_name=nome_backup
         )
     except Exception as e:
         session['backup_msg'] = f'❌ Erro ao criar backup: {str(e)}'
         return redirect(url_for('master_dashboard'))
-
-
-@app.route('/backup/listar')
-@login_required
-@master_required
-def listar_backups():
-    backup_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'backups')
-    backups = []
-
-    if os.path.exists(backup_dir):
-        for arquivo in os.listdir(backup_dir):
-            if arquivo.endswith('.db'):
-                caminho = os.path.join(backup_dir, arquivo)
-                backups.append({
-                    'nome': arquivo,
-                    'data': datetime.fromtimestamp(os.path.getctime(caminho)).strftime("%d/%m/%Y %H:%M:%S"),
-                    'tamanho': f'{os.path.getsize(caminho) / 1024:.2f} KB'
-                })
-
-    backups.sort(key=lambda x: x['data'], reverse=True)
-    return jsonify(backups)
-
-
-@app.route('/backup/restaurar/<nome_arquivo>', methods=['POST'])
-@login_required
-@master_required
-def restaurar_backup(nome_arquivo):
-    try:
-        data = request.json
-        senha = data.get('senha')
-
-        if not verificar_senha_master(senha):
-            return jsonify({'error': 'Senha do administrador incorreta!'}), 403
-
-        backup_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'backups')
-        caminho_backup = os.path.join(backup_dir, nome_arquivo)
-
-        if not os.path.exists(caminho_backup):
-            return jsonify({'error': 'Arquivo de backup não encontrado!'}), 404
-
-        shutil.copy2(caminho_backup, DB_PATH)
-
-        return jsonify({'success': True, 'message': f'✅ Backup restaurado com sucesso! Arquivo: {nome_arquivo}'})
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-
-# ==================== ZERAR DADOS ====================
-@app.route('/api/zerar-dados/<int:condominio_id>', methods=['POST'])
-@login_required
-@master_required
-def zerar_dados_condominio(condominio_id):
-    try:
-        data = request.json
-        senha = data.get('senha')
-
-        if not verificar_senha_master(senha):
-            return jsonify({'error': 'Senha do administrador incorreta!'}), 403
-
-        db = get_db()
-        cursor = db.cursor()
-
-        cursor.execute("SELECT COUNT(*) FROM pessoas WHERE condominio_id = %s", (condominio_id,))
-        total_pessoas = cursor.fetchone()[0]
-        cursor.execute("SELECT COUNT(*) FROM registros WHERE condominio_id = %s", (condominio_id,))
-        total_registros = cursor.fetchone()[0]
-
-        cursor.execute("DELETE FROM registros WHERE condominio_id = %s", (condominio_id,))
-        cursor.execute("DELETE FROM pessoas WHERE condominio_id = %s", (condominio_id,))
-
-        db.commit()
-        db.close()
-
-        return jsonify({
-            'success': True,
-            'message': f'✅ Dados zerados! Removidas {total_pessoas} pessoas e {total_registros} registros.'
-        })
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-
-@app.route('/api/zerar-tudo', methods=['POST'])
-@login_required
-@master_required
-def zerar_tudo():
-    try:
-        data = request.json
-        senha = data.get('senha')
-
-        if not verificar_senha_master(senha):
-            return jsonify({'error': 'Senha do administrador incorreta!'}), 403
-
-        db = get_db()
-        cursor = db.cursor()
-
-        cursor.execute("SELECT COUNT(*) FROM pessoas")
-        total_pessoas = cursor.fetchone()[0]
-        cursor.execute("SELECT COUNT(*) FROM registros")
-        total_registros = cursor.fetchone()[0]
-        cursor.execute("SELECT COUNT(*) FROM usuarios WHERE perfil = 'PORTEIRO'")
-        total_porteiros = cursor.fetchone()[0]
-
-        cursor.execute("DELETE FROM registros")
-        cursor.execute("DELETE FROM pessoas")
-        cursor.execute("DELETE FROM usuarios WHERE perfil = 'PORTEIRO'")
-
-        db.commit()
-        db.close()
-
-        return jsonify({
-            'success': True,
-            'message': f'✅ Banco zerado! Removidas {total_pessoas} pessoas, {total_registros} registros e {total_porteiros} porteiros.'
-        })
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
 
 
 # ==================== PORTEIRO RÁPIDO ====================
@@ -493,245 +403,6 @@ def porteiro_dashboard_rapido():
                            condominio_nome=condominio[0] if condominio else 'Desconhecido',
                            condominio_cor=condominio[1] if condominio else '#3498db',
                            condominio_id=condominio[2] if condominio else None)
-
-
-@app.route('/api/porteiro/buscar', methods=['POST'])
-@login_required
-def porteiro_buscar():
-    data = request.json
-    termo = data.get('termo', '').lower()
-    condominio_id = session.get('condominio_id')
-
-    db = get_db()
-    cursor = db.cursor()
-
-    cursor.execute("""
-        SELECT id, nome, tipo, documento, placa, telefone, casa, observacao
-        FROM pessoas 
-        WHERE condominio_id = %s AND (nome LIKE %s OR documento LIKE %s OR placa LIKE %s)
-        LIMIT 10
-    """, (condominio_id, f'%{termo}%', f'%{termo}%', f'%{termo}%'))
-    pessoas = cursor.fetchall()
-
-    cursor.execute("""
-        SELECT r.*, p.nome as pessoa_nome
-        FROM registros r
-        LEFT JOIN pessoas p ON r.pessoa_id = p.id
-        WHERE r.condominio_id = %s AND (r.titulo LIKE %s OR r.descricao LIKE %s)
-        ORDER BY r.data_hora DESC
-        LIMIT 10
-    """, (condominio_id, f'%{termo}%', f'%{termo}%'))
-    registros = cursor.fetchall()
-
-    db.close()
-
-    return jsonify({
-        'pessoas': [{
-            'id': p[0],
-            'nome': p[1],
-            'tipo': p[2],
-            'documento': p[3] or '-',
-            'placa': p[4] or '-',
-            'telefone': p[5] or '-',
-            'casa': p[6] or '-',
-            'observacao': p[7] or '-'
-        } for p in pessoas],
-        'registros': [{
-            'id': r[0],
-            'titulo': r[4],
-            'descricao': r[5],
-            'data_hora': r[6],
-            'status': r[7],
-            'pessoa_nome': r[20] if len(r) > 20 else '-'
-        } for r in registros]
-    })
-
-
-@app.route('/api/porteiro/entrada', methods=['POST'])
-@login_required
-def registrar_entrada():
-    try:
-        data = request.json
-        condominio_id = session.get('condominio_id')
-
-        db = get_db()
-        cursor = db.cursor()
-
-        pessoa_id = None
-        if data.get('pessoa_id'):
-            pessoa_id = data['pessoa_id']
-        elif data.get('documento'):
-            cursor.execute("SELECT id FROM pessoas WHERE condominio_id = %s AND documento = %s",
-                           (condominio_id, data['documento']))
-            pessoa = cursor.fetchone()
-            if pessoa:
-                pessoa_id = pessoa[0]
-
-        if not pessoa_id and data.get('nome'):
-            cursor.execute("""
-                INSERT INTO pessoas (condominio_id, tipo, nome, documento, placa, telefone, casa, observacao)
-                VALUES (%s, 'VISITANTE', %s, %s, %s, %s, %s, %s)
-            """, (condominio_id, data['nome'], data.get('documento', ''),
-                  data.get('placa', ''), data.get('telefone', ''), data.get('casa', ''),
-                  data.get('observacao', '')))
-            db.commit()
-            pessoa_id = cursor.lastrowid
-
-        agora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        cursor.execute("""
-            INSERT INTO registros (condominio_id, pessoa_id, tipo, titulo, descricao, status, cor, acao, hora_entrada, visitando, registrado_por)
-            VALUES (%s, %s, 'ENTRADA', %s, %s, 'DENTRO', '#2ecc71', 'LIBERADO', %s, %s, %s)
-        """, (condominio_id, pessoa_id, f"Entrada de {data['nome']}",
-              data.get('observacao', ''), agora, data.get('visitando', ''), session.get('usuario_nome', 'Porteiro')))
-        db.commit()
-        db.close()
-
-        return jsonify({'success': True, 'message': f'✅ Entrada registrada às {agora}'})
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-
-@app.route('/api/porteiro/saida/<int:registro_id>', methods=['PUT'])
-@login_required
-def registrar_saida(registro_id):
-    try:
-        db = get_db()
-        cursor = db.cursor()
-
-        agora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-        cursor.execute("SELECT hora_entrada FROM registros WHERE id = %s", (registro_id,))
-        registro = cursor.fetchone()
-
-        if not registro:
-            return jsonify({'error': 'Registro não encontrado'}), 404
-
-        hora_entrada = registro[0]
-
-        from datetime import datetime as dt
-        entrada_dt = dt.strptime(hora_entrada, "%Y-%m-%d %H:%M:%S")
-        saida_dt = dt.strptime(agora, "%Y-%m-%d %H:%M:%S")
-        tempo = saida_dt - entrada_dt
-        horas = tempo.seconds // 3600
-        minutos = (tempo.seconds % 3600) // 60
-
-        tempo_texto = f"{horas}h {minutos}min" if horas > 0 else f"{minutos}min"
-
-        cursor.execute("""
-            UPDATE registros 
-            SET hora_saida = %s, status = %s, descricao = COALESCE(descricao, '') || ' | Saída: ' || %s || ' | Tempo: ' || %s
-            WHERE id = %s
-        """, (agora, 'FINALIZADO', agora, tempo_texto, registro_id))
-        db.commit()
-        db.close()
-
-        return jsonify({'success': True, 'message': f'✅ Saída registrada às {agora}', 'tempo': tempo_texto})
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-
-@app.route('/api/porteiro/visitantes-ativos')
-@login_required
-def visitantes_ativos():
-    try:
-        condominio_id = session.get('condominio_id')
-        db = get_db()
-        cursor = db.cursor()
-
-        cursor.execute("""
-            SELECT r.id, p.nome, p.documento, p.placa, p.casa, r.hora_entrada, r.visitando
-            FROM registros r
-            JOIN pessoas p ON r.pessoa_id = p.id
-            WHERE r.condominio_id = %s AND r.tipo = 'ENTRADA' AND r.status = 'DENTRO'
-            ORDER BY r.hora_entrada DESC
-        """, (condominio_id,))
-
-        visitantes = cursor.fetchall()
-        db.close()
-
-        return jsonify([{
-            'id': v[0],
-            'nome': v[1],
-            'documento': v[2] or '-',
-            'placa': v[3] or '-',
-            'casa': v[4] or '-',
-            'hora_entrada': v[5],
-            'visitando': v[6] or '-'
-        } for v in visitantes])
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-
-@app.route('/api/porteiro/registrar', methods=['POST'])
-@login_required
-def porteiro_registrar():
-    try:
-        data = request.json
-        condominio_id = session.get('condominio_id')
-
-        db = get_db()
-        cursor = db.cursor()
-
-        pessoa_id = None
-        if data.get('pessoa_id'):
-            pessoa_id = data['pessoa_id']
-        elif data.get('documento'):
-            cursor.execute("SELECT id FROM pessoas WHERE condominio_id = %s AND documento = %s",
-                           (condominio_id, data['documento']))
-            pessoa = cursor.fetchone()
-            if pessoa:
-                pessoa_id = pessoa[0]
-
-        if not pessoa_id and data.get('nome') and data['nome'] != 'SISTEMA':
-            cursor.execute("""
-                INSERT INTO pessoas (condominio_id, tipo, nome, documento, placa, telefone, casa, observacao)
-                VALUES (%s, 'VISITANTE', %s, %s, %s, %s, %s, %s)
-            """, (condominio_id, data['nome'], data.get('documento', ''),
-                  data.get('placa', ''), data.get('telefone', ''), data.get('casa', ''),
-                  data.get('observacao', '')))
-            db.commit()
-            pessoa_id = cursor.lastrowid
-
-        cores_padrao = {
-            'ENCOMENDA': '#2ecc71',
-            'VISITANTE': '#9b59b6',
-            'MORADOR': '#1abc9c',
-            'EMERGENCIA': '#e74c3c',
-            'OCORRENCIA': '#e67e22',
-            'AVISO': '#f39c12',
-            'RECLAMACAO': '#95a5a6'
-        }
-        cor = data.get('cor', cores_padrao.get(data.get('tipo', 'AVISO'), '#3498db'))
-
-        cursor.execute("""
-            INSERT INTO registros (condominio_id, pessoa_id, tipo, titulo, descricao, status, cor, acao, visitando, registrado_por)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-        """, (condominio_id, pessoa_id, data['tipo'], data.get('motivo', data.get('titulo', 'Registro')),
-              data.get('observacao', ''), data.get('status', 'AGUARDANDO'), cor, data.get('acao', 'REGISTRADO'),
-              data.get('visitando', ''), session.get('usuario_nome', 'Sistema')))
-        db.commit()
-        db.close()
-
-        return jsonify({'success': True, 'id': cursor.lastrowid})
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-
-# ==================== PORTEIRO DASHBOARD NORMAL ====================
-@app.route('/porteiro')
-@login_required
-def porteiro_dashboard():
-    if session.get('perfil') == 'MASTER':
-        return redirect(url_for('master_dashboard'))
-
-    db = get_db()
-    cursor = db.cursor()
-    cursor.execute("SELECT nome, cor FROM condominios WHERE id = %s", (session['condominio_id'],))
-    condominio = cursor.fetchone()
-    db.close()
-    return render_template('porteiro_dashboard.html',
-                           condominio_nome=condominio[0] if condominio else 'Desconhecido',
-                           condominio_cor=condominio[1] if condominio else '#3498db')
 
 
 # ==================== CRUD PESSOAS ====================
@@ -855,6 +526,233 @@ def crud_registros():
         return jsonify({'success': True})
 
 
+# ==================== ROTAS ADICIONAIS ====================
+@app.route('/api/porteiro/buscar', methods=['POST'])
+@login_required
+def porteiro_buscar():
+    data = request.json
+    termo = data.get('termo', '').lower()
+    condominio_id = session.get('condominio_id')
+
+    db = get_db()
+    cursor = db.cursor()
+
+    cursor.execute("""
+        SELECT id, nome, tipo, documento, placa, telefone, casa, observacao
+        FROM pessoas 
+        WHERE condominio_id = %s AND (nome ILIKE %s OR documento ILIKE %s OR placa ILIKE %s)
+        LIMIT 10
+    """, (condominio_id, f'%{termo}%', f'%{termo}%', f'%{termo}%'))
+    pessoas = cursor.fetchall()
+
+    db.close()
+
+    return jsonify({
+        'pessoas': [{
+            'id': p[0],
+            'nome': p[1],
+            'tipo': p[2],
+            'documento': p[3] or '-',
+            'placa': p[4] or '-',
+            'telefone': p[5] or '-',
+            'casa': p[6] or '-',
+            'observacao': p[7] or '-'
+        } for p in pessoas]
+    })
+
+
+@app.route('/api/porteiro/entrada', methods=['POST'])
+@login_required
+def registrar_entrada():
+    try:
+        data = request.json
+        condominio_id = session.get('condominio_id')
+
+        db = get_db()
+        cursor = db.cursor()
+
+        pessoa_id = None
+        if data.get('pessoa_id'):
+            pessoa_id = data['pessoa_id']
+        elif data.get('documento'):
+            cursor.execute("SELECT id FROM pessoas WHERE condominio_id = %s AND documento = %s",
+                           (condominio_id, data['documento']))
+            pessoa = cursor.fetchone()
+            if pessoa:
+                pessoa_id = pessoa[0]
+
+        if not pessoa_id and data.get('nome'):
+            cursor.execute("""
+                INSERT INTO pessoas (condominio_id, tipo, nome, documento, placa, telefone, casa, observacao)
+                VALUES (%s, 'VISITANTE', %s, %s, %s, %s, %s, %s)
+            """, (condominio_id, data['nome'], data.get('documento', ''),
+                  data.get('placa', ''), data.get('telefone', ''), data.get('casa', ''),
+                  data.get('observacao', '')))
+            db.commit()
+            pessoa_id = cursor.lastrowid
+
+        agora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        cursor.execute("""
+            INSERT INTO registros (condominio_id, pessoa_id, tipo, titulo, descricao, status, cor, acao, hora_entrada, visitando, registrado_por)
+            VALUES (%s, %s, 'ENTRADA', %s, %s, 'DENTRO', '#2ecc71', 'LIBERADO', %s, %s, %s)
+        """, (condominio_id, pessoa_id, f"Entrada de {data['nome']}",
+              data.get('observacao', ''), agora, data.get('visitando', ''), session.get('usuario_nome', 'Porteiro')))
+        db.commit()
+        db.close()
+
+        return jsonify({'success': True, 'message': f'✅ Entrada registrada às {agora}'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/porteiro/visitantes-ativos')
+@login_required
+def visitantes_ativos():
+    try:
+        condominio_id = session.get('condominio_id')
+        db = get_db()
+        cursor = db.cursor()
+
+        cursor.execute("""
+            SELECT r.id, p.nome, p.documento, p.placa, p.casa, r.hora_entrada, r.visitando
+            FROM registros r
+            JOIN pessoas p ON r.pessoa_id = p.id
+            WHERE r.condominio_id = %s AND r.tipo = 'ENTRADA' AND r.status = 'DENTRO'
+            ORDER BY r.hora_entrada DESC
+        """, (condominio_id,))
+
+        visitantes = cursor.fetchall()
+        db.close()
+
+        return jsonify([{
+            'id': v[0],
+            'nome': v[1],
+            'documento': v[2] or '-',
+            'placa': v[3] or '-',
+            'casa': v[4] or '-',
+            'hora_entrada': v[5],
+            'visitando': v[6] or '-'
+        } for v in visitantes])
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/porteiro/registrar', methods=['POST'])
+@login_required
+def porteiro_registrar():
+    try:
+        data = request.json
+        condominio_id = session.get('condominio_id')
+
+        db = get_db()
+        cursor = db.cursor()
+
+        pessoa_id = None
+        if data.get('pessoa_id'):
+            pessoa_id = data['pessoa_id']
+        elif data.get('documento'):
+            cursor.execute("SELECT id FROM pessoas WHERE condominio_id = %s AND documento = %s",
+                           (condominio_id, data['documento']))
+            pessoa = cursor.fetchone()
+            if pessoa:
+                pessoa_id = pessoa[0]
+
+        if not pessoa_id and data.get('nome') and data['nome'] != 'SISTEMA':
+            cursor.execute("""
+                INSERT INTO pessoas (condominio_id, tipo, nome, documento, placa, telefone, casa, observacao)
+                VALUES (%s, 'VISITANTE', %s, %s, %s, %s, %s, %s)
+            """, (condominio_id, data['nome'], data.get('documento', ''),
+                  data.get('placa', ''), data.get('telefone', ''), data.get('casa', ''),
+                  data.get('observacao', '')))
+            db.commit()
+            pessoa_id = cursor.lastrowid
+
+        cores_padrao = {
+            'ENCOMENDA': '#2ecc71',
+            'VISITANTE': '#9b59b6',
+            'MORADOR': '#1abc9c',
+            'EMERGENCIA': '#e74c3c',
+            'OCORRENCIA': '#e67e22',
+            'AVISO': '#f39c12',
+            'RECLAMACAO': '#95a5a6'
+        }
+        cor = data.get('cor', cores_padrao.get(data.get('tipo', 'AVISO'), '#3498db'))
+
+        cursor.execute("""
+            INSERT INTO registros (condominio_id, pessoa_id, tipo, titulo, descricao, status, cor, acao, visitando, registrado_por)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        """, (condominio_id, pessoa_id, data['tipo'], data.get('motivo', data.get('titulo', 'Registro')),
+              data.get('observacao', ''), data.get('status', 'AGUARDANDO'), cor, data.get('acao', 'REGISTRADO'),
+              data.get('visitando', ''), session.get('usuario_nome', 'Sistema')))
+        db.commit()
+        db.close()
+
+        return jsonify({'success': True, 'id': cursor.lastrowid})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+# ==================== PÁGINA DE BACKUP ====================
+@app.route('/gerenciar-backups')
+@login_required
+@master_required
+def gerenciar_backups():
+    return render_template('gerenciar_backups.html')
+
+
+@app.route('/backup/listar')
+@login_required
+@master_required
+def listar_backups():
+    backup_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'backups')
+    backups = []
+
+    if os.path.exists(backup_dir):
+        for arquivo in os.listdir(backup_dir):
+            if arquivo.endswith('.db') or arquivo.endswith('.sql'):
+                caminho = os.path.join(backup_dir, arquivo)
+                backups.append({
+                    'nome': arquivo,
+                    'data': datetime.fromtimestamp(os.path.getctime(caminho)).strftime("%d/%m/%Y %H:%M:%S"),
+                    'tamanho': f'{os.path.getsize(caminho) / 1024:.2f} KB'
+                })
+
+    backups.sort(key=lambda x: x['data'], reverse=True)
+    return jsonify(backups)
+
+
+@app.route('/backup/restaurar/<nome_arquivo>', methods=['POST'])
+@login_required
+@master_required
+def restaurar_backup(nome_arquivo):
+    try:
+        data = request.json
+        senha = data.get('senha')
+
+        if not verificar_senha_master(senha):
+            return jsonify({'error': 'Senha do administrador incorreta!'}), 403
+
+        backup_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'backups')
+        caminho_backup = os.path.join(backup_dir, nome_arquivo)
+
+        if not os.path.exists(caminho_backup):
+            return jsonify({'error': 'Arquivo de backup não encontrado!'}), 404
+
+        # Para PostgreSQL, restaura via psql
+        database_url = os.environ.get('DATABASE_URL')
+        if database_url and nome_arquivo.endswith('.sql'):
+            import subprocess
+            subprocess.run(f'psql {database_url} < {caminho_backup}', shell=True)
+        else:
+            # Fallback para SQLite
+            from database.init_db import DB_PATH
+            shutil.copy2(caminho_backup, DB_PATH)
+
+        return jsonify({'success': True, 'message': f'✅ Backup restaurado com sucesso! Arquivo: {nome_arquivo}'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 # ==================== RELATÓRIO CONSOLIDADO ====================
 @app.route('/api/relatorio-consolidado/<int:condominio_id>')
 @login_required
@@ -867,30 +765,18 @@ def relatorio_consolidado(condominio_id):
             SELECT 
                 r.id,
                 r.data_hora,
-                CASE 
-                    WHEN r.pessoa_id IS NULL THEN r.titulo
-                    ELSE COALESCE(p.nome, r.titulo)
-                END as nome,
+                COALESCE(p.nome, r.titulo) as nome,
                 COALESCE(p.documento, '') as documento,
                 COALESCE(p.placa, '') as placa,
                 COALESCE(p.casa, '') as casa,
                 r.tipo,
                 r.titulo as motivo,
-                COALESCE(r.descricao, '') as observacao,
+                r.descricao as observacao,
                 r.status,
                 r.cor,
                 r.acao,
-                r.hora_entrada,
-                r.hora_saida,
-                COALESCE(r.visitando, '') as visitando,
-                COALESCE(r.entregador, '') as entregador,
-                COALESCE(r.destinatario, '') as destinatario,
-                COALESCE(r.quem_recebeu, '') as quem_recebeu,
-                r.data_retirada,
-                COALESCE(r.quem_retirou, '') as quem_retirou,
-                COALESCE(r.quem_liberou, '') as quem_liberou,
-                COALESCE(r.registrado_por, 'Sistema') as registrado_por,
-                COALESCE(p.telefone, '') as telefone
+                r.visitando,
+                COALESCE(r.registrado_por, 'Sistema') as registrado_por
             FROM registros r
             LEFT JOIN pessoas p ON r.pessoa_id = p.id
             WHERE r.condominio_id = %s
@@ -905,27 +791,18 @@ def relatorio_consolidado(condominio_id):
             resultado.append({
                 'id': r[0],
                 'data_hora': r[1],
-                'nome': r[2] if r[2] else '-',
-                'documento': r[3] if r[3] else '-',
-                'placa': r[4] if r[4] else '-',
-                'casa': r[5] if r[5] else '-',
-                'tipo': r[6] if r[6] else '-',
-                'motivo': r[7] if r[7] else '-',
-                'observacao': r[8] if r[8] else '-',
-                'status': r[9] if r[9] else '-',
-                'cor': r[10] if r[10] else '#3498db',
-                'acao': r[11] if r[11] else '-',
-                'hora_entrada': r[12] if r[12] else '-',
-                'hora_saida': r[13] if r[13] else '-',
-                'visitando': r[14] if r[14] else '-',
-                'entregador': r[15] if r[15] else '-',
-                'destinatario': r[16] if r[16] else '-',
-                'quem_recebeu': r[17] if r[17] else '-',
-                'data_retirada': r[18] if r[18] else '-',
-                'quem_retirou': r[19] if r[19] else '-',
-                'quem_liberou': r[20] if r[20] else '-',
-                'registrado_por': r[21] if r[21] else 'Sistema',
-                'telefone': r[22] if r[22] else '-'
+                'nome': r[2] or '-',
+                'documento': r[3] or '-',
+                'placa': r[4] or '-',
+                'casa': r[5] or '-',
+                'tipo': r[6],
+                'motivo': r[7],
+                'observacao': r[8] or '-',
+                'status': r[9],
+                'cor': r[10] or '#3498db',
+                'acao': r[11] or 'LIBERADO',
+                'visitando': r[12] or '-',
+                'registrado_por': r[13] or 'Sistema'
             })
 
         return jsonify({
@@ -952,51 +829,7 @@ def visualizacao_consolidada(condominio_id):
                            condominio_id=condominio_id)
 
 
-# ==================== GERENCIAR BACKUPS ====================
-@app.route('/gerenciar-backups')
-@login_required
-@master_required
-def gerenciar_backups():
-    return render_template('gerenciar_backups.html')
-
-
-@app.route('/backup/baixar/<nome_arquivo>')
-@login_required
-@master_required
-def baixar_backup(nome_arquivo):
-    try:
-        backup_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'backups')
-        caminho_backup = os.path.join(backup_dir, nome_arquivo)
-
-        if not os.path.exists(caminho_backup):
-            return jsonify({'error': 'Arquivo não encontrado'}), 404
-
-        return send_file(
-            caminho_backup,
-            mimetype='application/x-sqlite3',
-            as_attachment=True,
-            download_name=nome_arquivo
-        )
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-
-@app.route('/backup/excluir/<nome_arquivo>', methods=['DELETE'])
-@login_required
-@master_required
-def excluir_backup(nome_arquivo):
-    try:
-        backup_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'backups')
-        caminho_backup = os.path.join(backup_dir, nome_arquivo)
-
-        if not os.path.exists(caminho_backup):
-            return jsonify({'error': 'Arquivo não encontrado'}), 404
-
-        os.remove(caminho_backup)
-        return jsonify({'success': True})
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
 if __name__ == '__main__':
     init_db()
-    app.run(debug=True, host='localhost', port=5000)
+    port = int(os.environ.get('PORT', 5000))
+    app.run(debug=False, host='0.0.0.0', port=port)
